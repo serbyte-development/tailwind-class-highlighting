@@ -83,6 +83,16 @@
         }
       },
       {
+        "id": "tailwindClassHighlighting.unresolvedVariant",
+        "description": "Foreground color for unresolved Tailwind variants whose utility is otherwise valid.",
+        "defaults": {
+          "dark": "#E5C07B",
+          "light": "#9A6700",
+          "highContrast": "#FFFF66",
+          "highContrastLight": "#7A5200"
+        }
+      },
+      {
         "id": "tailwindClassHighlighting.arbitrary",
         "description": "Foreground color for square brackets in Tailwind arbitrary variants and values.",
         "defaults": {

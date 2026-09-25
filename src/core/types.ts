@@ -2,6 +2,7 @@ export const highlightGroups = [
   'utility',
   'breakpoint',
   'variant',
+  'unresolvedVariant',
   'arbitrary',
   'important',
 ] as const

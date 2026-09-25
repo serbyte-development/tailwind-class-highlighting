@@ -78,6 +78,56 @@ describe('analyzeText', () => {
     expect(values).not.toContain('variableName')
   })
 
+  it('highlights unresolved variants when the underlying utility is valid', () => {
+    const text = `<div className="active-true:bg-brand hover:active-true:w-[13px] hocus:bg-brand custom-card" />`
+    const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({
+      value: 'active-true:',
+      group: 'unresolvedVariant',
+    })
+    expect(highlighted).toContainEqual({ value: 'hover:', group: 'variant' })
+    expect(highlighted).toContainEqual({ value: 'bg-brand', group: 'utility' })
+    expect(highlighted).toContainEqual({ value: 'w-[13px]', group: 'utility' })
+    expect(highlighted).toContainEqual({ value: 'hocus:', group: 'variant' })
+    expect(highlighted.some(({ value }) => value === 'custom-card')).toBe(false)
+  })
+
+  it('leaves unresolved-looking custom classes alone when the utility is not Tailwind', () => {
+    const text = `<div className="active-true:custom-card custom-card" />`
+
+    expect(analyzeText(text, options, scanner, validator)).toEqual([])
+  })
+
+  it('batches unresolved-variant probes into one extra validation call', () => {
+    const calls: string[][] = []
+    const batchingValidator: CandidateValidator = {
+      getValidCandidates(candidates) {
+        calls.push([...candidates])
+        return new Set(
+          candidates.filter(
+            (candidate) =>
+              candidate === 'bg-red-500' ||
+              candidate === 'hover:bg-red-500' ||
+              candidate === 'focus:bg-red-500',
+          ),
+        )
+      },
+      isBreakpointVariant: () => false,
+    }
+    const text = `<div className="missing:hover:bg-red-500 missing:focus:bg-red-500" />`
+
+    analyzeText(text, options, scanner, batchingValidator)
+
+    expect(calls).toHaveLength(2)
+    expect(new Set(calls[1])).toEqual(
+      new Set(['bg-red-500', 'missing:bg-red-500', 'hover:bg-red-500', 'focus:bg-red-500']),
+    )
+  })
+
   it('uses important styling for the entire class instead of variant or arbitrary colors', () => {
     const text = `<div className="hover:!mt-4 w-[13px]!" />`
     const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({

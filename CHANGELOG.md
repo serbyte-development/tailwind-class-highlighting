@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Highlight unresolved Tailwind variants with a muted warning color when the underlying utility remains valid, including removed project `@custom-variant` definitions.
+
 ## 0.1.0
 
 - Initial release as Tailwind Class Highlighting.

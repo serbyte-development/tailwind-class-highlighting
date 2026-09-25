@@ -8,6 +8,7 @@ import { TailwindProjectManager } from '../src/tailwind/project'
 const scanner = new Scanner({ sources: [] })
 let validator: CandidateValidator
 const line = `<div className={cn("flex items-center gap-2 md:hover:bg-red-500/50", active && "w-full rounded-lg shadow-sm")} />\n`
+const unresolvedLine = `<div className={cn("flex items-center active-true:hover:bg-red-500/50", active && "w-full rounded-lg shadow-sm")} />\n`
 const options = {
   classAttributes: ['class', 'className'],
   classFunctions: ['clsx', 'cn', 'cva', 'twMerge'],
@@ -27,6 +28,11 @@ for (const lineCount of [500, 1000, 5000]) {
   describe(`${lineCount.toLocaleString()}-line TSX document`, () => {
     bench('scan + project validation', () => {
       analyzeText(document, options, scanner, validator)
+    })
+
+    const unresolvedDocument = unresolvedLine.repeat(lineCount)
+    bench('scan + unresolved variant validation', () => {
+      analyzeText(unresolvedDocument, options, scanner, validator)
     })
   })
 }

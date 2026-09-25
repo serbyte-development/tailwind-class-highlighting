@@ -14,7 +14,7 @@ Tailwind owns semantics. Core analysis accepts an injected validator and contain
 
 ## Global Invariants
 
-- Visual contract stays restrained: utility gets faint dotted underline; breakpoint and state variants use separate foreground groups; arbitrary syntax colors only square brackets; important candidate gets one whole-candidate foreground; custom/unrecognized candidates get nothing.
+- Visual contract stays restrained: utility gets faint dotted underline; breakpoint and state variants use separate foreground groups; unresolved variants use a muted warning foreground when their utility still validates; arbitrary syntax colors only square brackets; important candidate gets one whole-candidate foreground; ordinary custom classes get nothing.
 - Project-local Tailwind v4 design system is sole authority for candidate validity and project breakpoint/container names.
 - Extension runs in workspace host because runtime loads project-local packages and CSS. Project resolution happens before native scanner loading.
 - Correctness wins over coverage. Ambiguous or unsupported project state clears decorations instead of guessing or falling back.

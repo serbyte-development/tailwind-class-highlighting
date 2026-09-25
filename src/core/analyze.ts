@@ -16,6 +16,12 @@ interface BufferRegion {
   sourceStart: number
 }
 
+interface ClassifiedVariant {
+  start: number
+  end: number
+  group: HighlightSpan['group']
+}
+
 function mergeRegions(regions: SourceRegion[]): SourceRegion[] {
   if (regions.length < 2) return regions
 
@@ -101,9 +107,56 @@ export function analyzeText(
     content: scanBuffer.content,
     extension: 'html',
   })
-  const validCandidates = validator.getValidCandidates([
-    ...new Set(candidates.map(({ candidate }) => candidate)),
-  ])
+  const uniqueCandidates = [...new Set(candidates.map(({ candidate }) => candidate))]
+  const validCandidates = validator.getValidCandidates(uniqueCandidates)
+  const candidateParts = new Map(
+    uniqueCandidates.map((candidate) => [candidate, splitCandidate(candidate)]),
+  )
+  const probeCandidates = new Set<string>()
+
+  for (const candidate of uniqueCandidates) {
+    if (validCandidates.has(candidate)) continue
+
+    const parts = candidateParts.get(candidate)!
+    if (parts.variantRanges.length === 0) continue
+
+    const utility = candidate.slice(parts.utilityStart)
+    if (!utility) continue
+
+    probeCandidates.add(utility)
+    for (const variant of parts.variantRanges) {
+      probeCandidates.add(candidate.slice(variant.start, variant.end) + utility)
+    }
+  }
+
+  const validProbeCandidates =
+    probeCandidates.size > 0
+      ? validator.getValidCandidates([...probeCandidates])
+      : new Set<string>()
+  const unresolvedCandidates = new Map<string, ClassifiedVariant[]>()
+
+  for (const candidate of uniqueCandidates) {
+    if (validCandidates.has(candidate)) continue
+
+    const parts = candidateParts.get(candidate)!
+    const utility = candidate.slice(parts.utilityStart)
+    if (!validProbeCandidates.has(utility)) continue
+
+    const variants = parts.variantRanges.map((variant): ClassifiedVariant => {
+      const probe = candidate.slice(variant.start, variant.end) + utility
+      if (!validProbeCandidates.has(probe)) return { ...variant, group: 'unresolvedVariant' }
+
+      const variantName = candidate.slice(variant.start, variant.end - 1)
+      return {
+        ...variant,
+        group: validator.isBreakpointVariant(variantName) ? 'breakpoint' : 'variant',
+      }
+    })
+
+    if (variants.some(({ group }) => group === 'unresolvedVariant')) {
+      unresolvedCandidates.set(candidate, variants)
+    }
+  }
   const highlights = new Map<string, HighlightSpan>()
 
   for (const { candidate, position } of candidates) {
@@ -111,8 +164,33 @@ export function analyzeText(
     const sourceStart = mapToSource(scanBuffer.regions, bufferStart, bufferStart + candidate.length)
     if (sourceStart == null) continue
 
-    const parts = splitCandidate(candidate)
-    if (!validCandidates.has(candidate)) continue
+    const parts = candidateParts.get(candidate)!
+
+    if (!validCandidates.has(candidate)) {
+      const variants = unresolvedCandidates.get(candidate)
+      if (!variants) continue
+
+      for (const variant of variants) {
+        addSpan(highlights, sourceStart, variant.start, variant.end, variant.group)
+      }
+
+      for (const range of findArbitraryBracketRanges(candidate)) {
+        if (
+          variants.some(
+            (variant) =>
+              variant.group === 'unresolvedVariant' &&
+              range.start >= variant.start &&
+              range.end <= variant.end,
+          )
+        ) {
+          continue
+        }
+        addSpan(highlights, sourceStart, range.start, range.end, 'arbitrary')
+      }
+
+      addSpan(highlights, sourceStart, parts.utilityStart, candidate.length, 'utility')
+      continue
+    }
 
     const important = findImportantModifierRanges(candidate, parts.utilityStart).length > 0
 

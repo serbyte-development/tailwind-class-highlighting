@@ -3,7 +3,14 @@ import type { HighlightSpan } from '../core/types'
 
 type RenderGroup = HighlightSpan['group']
 
-const renderGroups: RenderGroup[] = ['utility', 'breakpoint', 'variant', 'arbitrary', 'important']
+const renderGroups: RenderGroup[] = [
+  'utility',
+  'breakpoint',
+  'variant',
+  'arbitrary',
+  'important',
+  'unresolvedVariant',
+]
 
 function dottedUnderline(): vscode.DecorationRenderOptions {
   return {
@@ -29,6 +36,12 @@ export class DecorationRenderer implements vscode.Disposable {
       'variant',
       vscode.window.createTextEditorDecorationType({
         color: new vscode.ThemeColor('tailwindClassHighlighting.variant'),
+      }),
+    )
+    this.decorations.set(
+      'unresolvedVariant',
+      vscode.window.createTextEditorDecorationType({
+        color: new vscode.ThemeColor('tailwindClassHighlighting.unresolvedVariant'),
       }),
     )
     this.decorations.set(
