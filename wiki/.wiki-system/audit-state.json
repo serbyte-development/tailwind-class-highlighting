@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "pages": {
+    "pages/build-release.md": {
+      "fingerprint": "sha256:b7ae95aeb9a585fe96fa8a23fa124154fec573c0f3b33f49cd5ab60ae8f46dee"
+    },
+    "pages/extension-runtime.md": {
+      "fingerprint": "sha256:30e0cbe57bae79ae8dbf8041325f1811849670990cb6143ebf45728a2965fd16"
+    },
+    "pages/highlighting-pipeline.md": {
+      "fingerprint": "sha256:01447bc8468fab3f8809e31140d99ecefa64297579f7091e46e91443b020e1f2"
+    },
+    "pages/open-questions-risks.md": {
+      "fingerprint": "sha256:b3d2fdb940ee9fb749bae3f32364ce8ff94bc1a36f6992d350719b13773d55fb"
+    },
+    "pages/tailwind-project-resolution.md": {
+      "fingerprint": "sha256:979c3ed9d212dc3f800eaef7b9dca80d1cf64568941812ca34f220d719661cf5"
+    }
+  }
+}
