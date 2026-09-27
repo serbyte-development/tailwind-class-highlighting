@@ -1,12 +1,19 @@
 import {
   findArbitraryBracketRanges,
+  findArbitraryValueRanges,
+  findCssVariableRanges,
   findImportantModifierRanges,
   findModifierRanges,
   splitCandidate,
 } from './candidate'
 import { findClassTextRegions, findSourceRegions, type RegionOptions } from './regions'
 import type { CandidateScanner } from './scanner'
-import type { HighlightGroup, HighlightSpan, SourceRegion } from './types'
+import {
+  specializedVariantGroups,
+  type HighlightGroup,
+  type HighlightSpan,
+  type SourceRegion,
+} from './types'
 import type { CandidateValidator } from './validator'
 
 export interface AnalyzeOptions extends RegionOptions {
@@ -29,12 +36,33 @@ interface CandidateSyntax {
   parts: ReturnType<typeof splitCandidate>
   prefixRange: SourceRegion | null
   arbitraryRanges: SourceRegion[]
+  arbitraryValueRanges: SourceRegion[]
+  cssVariableRanges: SourceRegion[]
   modifierRanges: SourceRegion[]
   important: boolean
 }
 
+const defaultDisabledGroups = new Set<HighlightGroup>([
+  'nonTailwind',
+  'arbitraryValue',
+  'cssVariable',
+  ...specializedVariantGroups,
+])
+
 function isGroupEnabled(options: AnalyzeOptions, group: HighlightGroup): boolean {
-  return options.enabledGroups?.has(group) ?? group !== 'nonTailwind'
+  return options.enabledGroups?.has(group) ?? !defaultDisabledGroups.has(group)
+}
+
+function classifyVariantGroup(
+  validator: CandidateValidator,
+  variantName: string,
+  options: AnalyzeOptions,
+  specializedVariantsEnabled: boolean,
+): HighlightGroup {
+  if (validator.isBreakpointVariant(variantName)) return 'breakpoint'
+  if (!specializedVariantsEnabled) return 'variant'
+  const specialized = validator.classifyVariant(variantName)
+  return specialized && isGroupEnabled(options, specialized) ? specialized : 'variant'
 }
 
 function mergeRegions(regions: SourceRegion[]): SourceRegion[] {
@@ -160,6 +188,11 @@ export function analyzeText(
   const validCandidates = validator.getValidCandidates(uniqueCandidates)
   const prefix = validator.getPrefix()
   const arbitraryEnabled = isGroupEnabled(options, 'arbitrary')
+  const arbitraryValueEnabled = isGroupEnabled(options, 'arbitraryValue')
+  const cssVariableEnabled = isGroupEnabled(options, 'cssVariable')
+  const specializedVariantsEnabled = specializedVariantGroups.some((group) =>
+    isGroupEnabled(options, group),
+  )
   const modifierEnabled = isGroupEnabled(options, 'modifier')
   const importantEnabled = isGroupEnabled(options, 'important')
   const candidateSyntax = new Map<string, CandidateSyntax>(
@@ -171,6 +204,12 @@ export function analyzeText(
           parts,
           prefixRange: getPrefixRange(candidate, parts, prefix),
           arbitraryRanges: arbitraryEnabled ? findArbitraryBracketRanges(candidate) : [],
+          arbitraryValueRanges: arbitraryValueEnabled
+            ? findArbitraryValueRanges(candidate, parts.utilityStart)
+            : [],
+          cssVariableRanges: cssVariableEnabled
+            ? findCssVariableRanges(candidate, parts.utilityStart)
+            : [],
           modifierRanges: modifierEnabled ? findModifierRanges(candidate, parts) : [],
           important:
             importantEnabled &&
@@ -223,7 +262,7 @@ export function analyzeText(
       const variantName = candidate.slice(variant.start, variant.end - 1)
       return {
         ...variant,
-        group: validator.isBreakpointVariant(variantName) ? 'breakpoint' : 'variant',
+        group: classifyVariantGroup(validator, variantName, options, specializedVariantsEnabled),
       }
     })
 
@@ -268,15 +307,30 @@ export function analyzeText(
           if (
             variants.some(
               (variant) =>
-                variant.group === 'unresolvedVariant' &&
+                variant.group !== 'variant' &&
+                variant.group !== 'breakpoint' &&
                 range.start >= variant.start &&
                 range.end <= variant.end,
             )
           ) {
             continue
           }
+          if (
+            syntax.arbitraryValueRanges.some(
+              (value) => range.start >= value.start && range.end <= value.end,
+            )
+          ) {
+            continue
+          }
           addSpan(highlights, sourceStart, range.start, range.end, 'arbitrary')
         }
+      }
+
+      for (const range of syntax.arbitraryValueRanges) {
+        addSpan(highlights, sourceStart, range.start, range.end, 'arbitraryValue')
+      }
+      for (const range of syntax.cssVariableRanges) {
+        addSpan(highlights, sourceStart, range.start, range.end, 'cssVariable')
       }
 
       if (modifierEnabled) {
@@ -308,7 +362,12 @@ export function analyzeText(
 
       for (const variant of prefixRange ? parts.variantRanges.slice(1) : parts.variantRanges) {
         const variantName = candidate.slice(variant.start, variant.end - 1)
-        const group = validator.isBreakpointVariant(variantName) ? 'breakpoint' : 'variant'
+        const group = classifyVariantGroup(
+          validator,
+          variantName,
+          options,
+          specializedVariantsEnabled,
+        )
         if (isGroupEnabled(options, group)) {
           addSpan(highlights, sourceStart, variant.start, variant.end, group)
         }
@@ -316,8 +375,34 @@ export function analyzeText(
 
       if (arbitraryEnabled) {
         for (const range of syntax.arbitraryRanges) {
+          const containingVariant = (
+            prefixRange ? parts.variantRanges.slice(1) : parts.variantRanges
+          ).find((variant) => range.start >= variant.start && range.end <= variant.end)
+          if (containingVariant) {
+            const variantName = candidate.slice(containingVariant.start, containingVariant.end - 1)
+            if (
+              classifyVariantGroup(validator, variantName, options, specializedVariantsEnabled) !==
+              'variant'
+            ) {
+              continue
+            }
+          }
+          if (
+            syntax.arbitraryValueRanges.some(
+              (value) => range.start >= value.start && range.end <= value.end,
+            )
+          ) {
+            continue
+          }
           addSpan(highlights, sourceStart, range.start, range.end, 'arbitrary')
         }
+      }
+
+      for (const range of syntax.arbitraryValueRanges) {
+        addSpan(highlights, sourceStart, range.start, range.end, 'arbitraryValue')
+      }
+      for (const range of syntax.cssVariableRanges) {
+        addSpan(highlights, sourceStart, range.start, range.end, 'cssVariable')
       }
 
       if (modifierEnabled) {

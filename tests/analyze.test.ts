@@ -119,6 +119,7 @@ describe('analyzeText', () => {
       },
       isBreakpointVariant: () => false,
       getPrefix: () => null,
+      classifyVariant: () => null,
     }
     const text = `<div className="missing:hover:bg-red-500 missing:focus:bg-red-500" />`
 
@@ -159,6 +160,74 @@ describe('analyzeText', () => {
       { value: '[', group: 'arbitrary' },
       { value: ']', group: 'arbitrary' },
     ])
+  })
+
+  it('keeps optional variant families on the generic variant color by default', () => {
+    const text = `<div className="group-hover:flex data-[state=open]:grid before:block dark:hidden [&>svg]:size-5" />`
+    const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    for (const value of ['group-hover:', 'data-[state=open]:', 'before:', 'dark:', '[&>svg]:']) {
+      expect(highlighted).toContainEqual({ value, group: 'variant' })
+    }
+  })
+
+  it('can opt into specialized variant families while preserving generic fallback', () => {
+    const enabledGroups = new Set([
+      'utility',
+      'variant',
+      'arbitrary',
+      'arbitraryVariant',
+      'relationshipVariant',
+      'attributeVariant',
+      'pseudoElementVariant',
+      'environmentVariant',
+    ] as const)
+    const text = `<div className="hover:block group-hover:flex data-[state=open]:grid before:block dark:hidden [&>svg]:size-5" />`
+    const highlighted = analyzeText(text, { ...options, enabledGroups }, scanner, validator).map(
+      (span) => ({
+        value: text.slice(span.start, span.end),
+        group: span.group,
+      }),
+    )
+
+    expect(highlighted).toContainEqual({ value: 'hover:', group: 'variant' })
+    expect(highlighted).toContainEqual({ value: 'group-hover:', group: 'relationshipVariant' })
+    expect(highlighted).toContainEqual({
+      value: 'data-[state=open]:',
+      group: 'attributeVariant',
+    })
+    expect(highlighted).toContainEqual({ value: 'before:', group: 'pseudoElementVariant' })
+    expect(highlighted).toContainEqual({ value: 'dark:', group: 'environmentVariant' })
+    expect(highlighted).toContainEqual({ value: '[&>svg]:', group: 'arbitraryVariant' })
+    expect(
+      highlighted.some(
+        ({ group, value }) => group === 'arbitrary' && (value === '[' || value === ']'),
+      ),
+    ).toBe(false)
+  })
+
+  it('can color full arbitrary values and Tailwind CSS-variable shorthand', () => {
+    const enabledGroups = new Set([
+      'utility',
+      'arbitrary',
+      'arbitraryValue',
+      'cssVariable',
+    ] as const)
+    const text = `<div className="w-[317px] bg-(--brand-color) text-(color:--body-text)" />`
+    const highlighted = analyzeText(text, { ...options, enabledGroups }, scanner, validator).map(
+      (span) => ({
+        value: text.slice(span.start, span.end),
+        group: span.group,
+      }),
+    )
+
+    expect(highlighted).toContainEqual({ value: '[317px]', group: 'arbitraryValue' })
+    expect(highlighted).toContainEqual({ value: '(--brand-color)', group: 'cssVariable' })
+    expect(highlighted).toContainEqual({ value: '(color:--body-text)', group: 'cssVariable' })
+    expect(highlighted.some(({ group }) => group === 'arbitrary')).toBe(false)
   })
 
   it('highlights slash modifiers without treating slashes inside arbitrary values as modifiers', () => {

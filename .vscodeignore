@@ -3,6 +3,7 @@
 .secrets/**
 .env*
 benchmarks/**
+buildplan.md
 examples/**
 images/icon-source.jpg
 wiki/**

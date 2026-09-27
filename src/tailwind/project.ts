@@ -3,11 +3,19 @@ import { createRequire } from 'node:module'
 import * as path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { CandidateValidator } from '../core/validator'
+import type { SpecializedVariantGroup } from '../core/types'
+
+interface TailwindVariant {
+  kind: string
+  root?: string
+  variant?: TailwindVariant
+}
 
 interface TailwindDesignSystem {
   candidatesToCss(classes: string[]): Array<string | null>
   getVariants?(): Array<{ name: string; values: string[] }>
   theme?: { prefix: string | null }
+  parseVariant?(variant: string): TailwindVariant | null
 }
 
 interface TailwindModule {
@@ -64,8 +72,45 @@ const ignoredDirectories = new Set([
 
 const stylesheetExtensions = new Set(['.css', '.pcss', '.postcss'])
 
+const relationshipVariantRoots = new Set(['group', 'peer', 'has', 'in'])
+const attributeVariantRoots = new Set(['data', 'aria'])
+const pseudoElementVariantRoots = new Set([
+  'before',
+  'after',
+  'first-letter',
+  'first-line',
+  'marker',
+  'selection',
+  'file',
+  'placeholder',
+  'backdrop',
+])
+const environmentVariantRoots = new Set([
+  'dark',
+  'motion-safe',
+  'motion-reduce',
+  'contrast-more',
+  'contrast-less',
+  'forced-colors',
+  'inverted-colors',
+  'portrait',
+  'landscape',
+  'print',
+  'noscript',
+  'supports',
+  'pointer-fine',
+  'pointer-coarse',
+  'pointer-none',
+  'any-pointer-fine',
+  'any-pointer-coarse',
+  'any-pointer-none',
+])
+
 class DesignSystemValidator implements CandidateValidator {
   private cache = new Map<string, boolean>()
+  // A validator belongs to one loaded CSS design system. Project invalidation
+  // replaces it, including cached null results for generic/unknown variants.
+  private variantClassifications = new Map<string, SpecializedVariantGroup | null>()
   private breakpoints = new Set<string>()
   private containers = new Set<string>()
 
@@ -116,6 +161,27 @@ class DesignSystemValidator implements CandidateValidator {
 
   getPrefix(): string | null {
     return this.designSystem.theme?.prefix ?? null
+  }
+
+  classifyVariant(variant: string): SpecializedVariantGroup | null {
+    const cached = this.variantClassifications.get(variant)
+    if (cached !== undefined) return cached
+
+    const classification = this.classifyUncachedVariant(variant)
+    this.variantClassifications.set(variant, classification)
+    return classification
+  }
+
+  private classifyUncachedVariant(variant: string): SpecializedVariantGroup | null {
+    const parsed = this.designSystem.parseVariant?.(variant)
+    if (parsed?.kind === 'arbitrary') return 'arbitraryVariant'
+
+    const root = parsed?.root ?? variant.split(/[-/]/, 1)[0] ?? variant
+    if (relationshipVariantRoots.has(root)) return 'relationshipVariant'
+    if (attributeVariantRoots.has(root)) return 'attributeVariant'
+    if (pseudoElementVariantRoots.has(root)) return 'pseudoElementVariant'
+    if (environmentVariantRoots.has(root)) return 'environmentVariant'
+    return null
   }
 }
 

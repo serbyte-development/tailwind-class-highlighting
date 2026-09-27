@@ -63,16 +63,6 @@
         }
       },
       {
-        "id": "tailwindClassHighlighting.utility",
-        "description": "Optional foreground color for recognized Tailwind utility classes.",
-        "defaults": {
-          "dark": "#C9D1D9",
-          "light": "#334155",
-          "highContrast": "#FFFFFF",
-          "highContrastLight": "#000000"
-        }
-      },
-      {
         "id": "tailwindClassHighlighting.breakpoint",
         "description": "Foreground color for Tailwind breakpoint and container-query variants.",
         "defaults": {
@@ -90,6 +80,56 @@
           "light": "#087F5B",
           "highContrast": "#66FFC2",
           "highContrastLight": "#006644"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.arbitraryVariant",
+        "description": "Foreground color for opt-in arbitrary Tailwind variants.",
+        "defaults": {
+          "dark": "#6FC1D0",
+          "light": "#5B81A3",
+          "highContrast": "#8FC8DC",
+          "highContrastLight": "#567497"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.relationshipVariant",
+        "description": "Foreground color for opt-in group, peer, has, and in variants.",
+        "defaults": {
+          "dark": "#28E5CA",
+          "light": "#14A59D",
+          "highContrast": "#47EBD6",
+          "highContrastLight": "#0F9791"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.attributeVariant",
+        "description": "Foreground color for opt-in data and aria variants.",
+        "defaults": {
+          "dark": "#8AC77A",
+          "light": "#75884D",
+          "highContrast": "#A9CE86",
+          "highContrastLight": "#717A40"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.pseudoElementVariant",
+        "description": "Foreground color for opt-in pseudo-element variants.",
+        "defaults": {
+          "dark": "#87B9B1",
+          "light": "#727984",
+          "highContrast": "#A6C0BD",
+          "highContrastLight": "#6E6B77"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.environmentVariant",
+        "description": "Foreground color for opt-in environment and media variants.",
+        "defaults": {
+          "dark": "#44D0CF",
+          "light": "#3090A3",
+          "highContrast": "#63D7DB",
+          "highContrastLight": "#2B8296"
         }
       },
       {
@@ -130,6 +170,26 @@
           "light": "#6F42A1",
           "highContrast": "#D8C2FF",
           "highContrastLight": "#5B2C83"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.arbitraryValue",
+        "description": "Foreground color for opt-in full arbitrary Tailwind values.",
+        "defaults": {
+          "dark": "#C4A7E7",
+          "light": "#6F42A1",
+          "highContrast": "#D8C2FF",
+          "highContrastLight": "#5B2C83"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.cssVariable",
+        "description": "Foreground color for opt-in Tailwind CSS-variable shorthand values.",
+        "defaults": {
+          "dark": "#7AA2F7",
+          "light": "#315BB5",
+          "highContrast": "#8FB3FF",
+          "highContrastLight": "#24478F"
         }
       },
       {
@@ -244,7 +304,7 @@
         "tailwindClassHighlighting.styles.utility.colorEnabled": {
           "type": "boolean",
           "default": false,
-          "description": "Apply the tailwindClassHighlighting.utility foreground color to recognized utilities."
+          "description": "Apply the utility underline color to recognized utility text."
         },
         "tailwindClassHighlighting.styles.breakpoint.enabled": {
           "type": "boolean",
@@ -255,6 +315,31 @@
           "type": "boolean",
           "default": true,
           "description": "Enable foreground highlighting for state and behavior variants."
+        },
+        "tailwindClassHighlighting.styles.arbitraryVariant.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use a derived Variant color for arbitrary variants such as [&>svg]:. Falls back to Variant when disabled."
+        },
+        "tailwindClassHighlighting.styles.relationshipVariant.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use a derived Variant color for group, peer, has, and in variants. Falls back to Variant when disabled."
+        },
+        "tailwindClassHighlighting.styles.attributeVariant.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use a derived Variant color for data and aria variants. Falls back to Variant when disabled."
+        },
+        "tailwindClassHighlighting.styles.pseudoElementVariant.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use a derived Variant color for pseudo-element variants such as before: and placeholder:. Falls back to Variant when disabled."
+        },
+        "tailwindClassHighlighting.styles.environmentVariant.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use a derived Variant color for environment/media variants such as dark:, motion-reduce:, print:, and supports-*. Falls back to Variant when disabled."
         },
         "tailwindClassHighlighting.styles.unresolvedVariant.enabled": {
           "type": "boolean",
@@ -275,6 +360,16 @@
           "type": "boolean",
           "default": true,
           "description": "Enable foreground highlighting for square brackets in arbitrary values and variants."
+        },
+        "tailwindClassHighlighting.styles.arbitraryValue.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Highlight the complete arbitrary value such as [317px] instead of only its brackets."
+        },
+        "tailwindClassHighlighting.styles.cssVariable.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Highlight Tailwind CSS-variable shorthand values such as (--brand-color) and (color:--text)."
         },
         "tailwindClassHighlighting.styles.important.enabled": {
           "type": "boolean",

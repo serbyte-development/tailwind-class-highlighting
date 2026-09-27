@@ -2,12 +2,16 @@
 
 ## Unreleased
 
+- Cache variant-family classifications per loaded CSS design system, including generic/unknown results, and discard that cache when a fresh validator is loaded.
 - Highlight unresolved Tailwind variants with a muted warning color when the underlying utility remains valid, including removed project `@custom-variant` definitions.
 - Add configurable enable/disable settings for every visual category.
 - Add configurable utility underline styles and optional utility foreground coloring while keeping the default dotted underline with normal editor text color.
 - Add project-aware Tailwind prefix highlighting and slash modifier/fraction highlighting.
 - Add optional non-Tailwind class highlighting, disabled by default and constrained to literal class text so surrounding expression identifiers stay untouched.
-- Add `Tailwind Class Highlighting: Configure Styles` to open the extension's normal VS Code settings.
+- Add a live `Tailwind Class Highlighting: Configure Styles` panel with per-category enable, color, opacity, reset, and preview controls plus utility underline/text-color controls. The panel writes normal VS Code User Settings and theme-color overrides.
+- Add opt-in full arbitrary-value and CSS-variable shorthand highlighting.
+- Add opt-in arbitrary, relationship, attribute, pseudo-element, and environment/media variant families. They fall back to the existing Variant treatment when disabled, and Configure Styles derives their colors from one Variant base color.
+- Use alpha-capable native color pickers for opacity when supported, with a compact percentage fallback for older editor runtimes.
 
 ## 0.1.0
 

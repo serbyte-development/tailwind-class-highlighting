@@ -7,10 +7,17 @@ type RenderGroup = HighlightSpan['group']
 const foregroundThemeColors: Record<Exclude<RenderGroup, 'utility'>, string> = {
   breakpoint: 'tailwindClassHighlighting.breakpoint',
   variant: 'tailwindClassHighlighting.variant',
+  arbitraryVariant: 'tailwindClassHighlighting.arbitraryVariant',
+  relationshipVariant: 'tailwindClassHighlighting.relationshipVariant',
+  attributeVariant: 'tailwindClassHighlighting.attributeVariant',
+  pseudoElementVariant: 'tailwindClassHighlighting.pseudoElementVariant',
+  environmentVariant: 'tailwindClassHighlighting.environmentVariant',
   unresolvedVariant: 'tailwindClassHighlighting.unresolvedVariant',
   prefix: 'tailwindClassHighlighting.prefix',
   modifier: 'tailwindClassHighlighting.modifier',
   arbitrary: 'tailwindClassHighlighting.arbitrary',
+  arbitraryValue: 'tailwindClassHighlighting.arbitraryValue',
+  cssVariable: 'tailwindClassHighlighting.cssVariable',
   important: 'tailwindClassHighlighting.important',
   nonTailwind: 'tailwindClassHighlighting.nonTailwind',
 }
@@ -27,7 +34,9 @@ function utilityDecoration(
     options.borderWidth = underlineStyle === 'double' ? '0 0 3px 0' : '0 0 1px 0'
   }
 
-  if (colorEnabled) options.color = new vscode.ThemeColor('tailwindClassHighlighting.utility')
+  if (colorEnabled) {
+    options.color = new vscode.ThemeColor('tailwindClassHighlighting.utilityUnderline')
+  }
   return options
 }
 

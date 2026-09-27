@@ -22,17 +22,27 @@ function unique(values: string[]): string[] {
   return [...new Set(values)]
 }
 
-const styleDefaults: Record<HighlightGroup, boolean> = {
+export const highlightStyleDefaults: Readonly<Record<HighlightGroup, boolean>> = {
   utility: true,
   breakpoint: true,
   variant: true,
+  arbitraryVariant: false,
+  relationshipVariant: false,
+  attributeVariant: false,
+  pseudoElementVariant: false,
+  environmentVariant: false,
   unresolvedVariant: true,
   prefix: true,
   modifier: true,
   arbitrary: true,
+  arbitraryValue: false,
+  cssVariable: false,
   important: true,
   nonTailwind: false,
 }
+
+export const defaultUtilityUnderlineStyle: UtilityUnderlineStyle = 'dotted'
+export const defaultUtilityColorEnabled = false
 
 const underlineStyles = new Set<UtilityUnderlineStyle>([
   'dotted',
@@ -45,7 +55,7 @@ const underlineStyles = new Set<UtilityUnderlineStyle>([
 function getStyleConfiguration(config: vscode.WorkspaceConfiguration): HighlightStyleConfiguration {
   const enabledGroups = new Set<HighlightGroup>()
 
-  for (const [group, defaultEnabled] of Object.entries(styleDefaults) as Array<
+  for (const [group, defaultEnabled] of Object.entries(highlightStyleDefaults) as Array<
     [HighlightGroup, boolean]
   >) {
     if (config.get(`styles.${group}.enabled`, defaultEnabled)) enabledGroups.add(group)
@@ -53,13 +63,15 @@ function getStyleConfiguration(config: vscode.WorkspaceConfiguration): Highlight
 
   const underlineStyle = config.get<UtilityUnderlineStyle>(
     'styles.utility.underlineStyle',
-    'dotted',
+    defaultUtilityUnderlineStyle,
   )
 
   return {
     enabledGroups,
-    utilityUnderlineStyle: underlineStyles.has(underlineStyle) ? underlineStyle : 'dotted',
-    utilityColorEnabled: config.get('styles.utility.colorEnabled', false),
+    utilityUnderlineStyle: underlineStyles.has(underlineStyle)
+      ? underlineStyle
+      : defaultUtilityUnderlineStyle,
+    utilityColorEnabled: config.get('styles.utility.colorEnabled', defaultUtilityColorEnabled),
   }
 }
 

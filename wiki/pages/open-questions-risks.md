@@ -12,7 +12,7 @@ paths:
 
 - Source-region discovery is textual, not AST based. Unusual framework syntax can expose parser gaps; extend focused region tests with any parser change.
 - Tailwind v4 CSS-root discovery intentionally implements a smaller model than full Tailwind IntelliSense. Exact import anchoring and ambiguity handling favor deterministic correctness over broader heuristics.
-- Cache invalidation watches CSS-family files and `package.json`. Local modules loaded through Tailwind `@plugin` or `@config` can change without invalidation until another watched event or extension restart.
+- Cache invalidation watches saved CSS-family files and `package.json`. `@plugin` / `@config` modules are not individually watched, and Node's module cache can retain their code even after a CSS-triggered validator reload. An extension-host reload may be required. See [Tailwind Project Resolution](./tailwind-project-resolution.md) for watcher exclusions, symlinks, and cache ownership.
 - Current automated coverage is core/project unit tests. There is no VS Code extension-host integration suite for lifecycle, configuration, or theme behavior.
 - Native packaging covers six desktop OS/architecture targets. Web, musl-specific, armhf, and other targets require deliberate packaging/runtime work.
 - External registry state changes independently of repository state. Verify Marketplace/Open VSX status live before release decisions.

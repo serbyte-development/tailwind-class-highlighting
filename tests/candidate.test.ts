@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   findArbitraryBracketRanges,
+  findArbitraryValueRanges,
+  findCssVariableRanges,
   findImportantModifierRanges,
   findModifierRanges,
   splitCandidate,
@@ -50,5 +52,24 @@ describe('candidate emphasis ranges', () => {
     ])
     expect(findModifierRanges('w-1/2')).toEqual([{ start: 3, end: 5 }])
     expect(findModifierRanges(String.raw`bg-[foo\]bar/baz]`)).toEqual([])
+  })
+
+  it('finds complete arbitrary values only in the utility portion', () => {
+    const candidate = '[&>svg]:w-[calc(100%-2rem)]'
+    const parts = splitCandidate(candidate)
+
+    expect(findArbitraryValueRanges(candidate, parts.utilityStart)).toEqual([
+      { start: 10, end: candidate.length },
+    ])
+  })
+
+  it('finds Tailwind v4 CSS-variable shorthand ranges', () => {
+    const first = 'hover:bg-(--brand-color)'
+    const second = 'text-(color:--body-text)'
+
+    expect(findCssVariableRanges(first, splitCandidate(first).utilityStart)).toEqual([
+      { start: 9, end: first.length },
+    ])
+    expect(findCssVariableRanges(second, 0)).toEqual([{ start: 5, end: second.length }])
   })
 })

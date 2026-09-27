@@ -44,10 +44,12 @@ Tailwind Class Highlighting adds just enough visual structure to make those clas
 - Tailwind utilities get a faint dotted underline.
 - Breakpoint variants such as `sm:`, `md:`, `max-lg:`, and container-query breakpoints use a distinct color.
 - State and behavior variants such as `hover:`, `focus:`, `dark:`, `data-*`, and `aria-*` use a second color.
+- Optional variant families can distinguish arbitrary, relationship (`group-*`/`peer-*`/`has-*`/`in-*`), attribute (`data-*`/`aria-*`), pseudo-element, and environment/media variants. They are disabled by default and fall back to the normal Variant color.
 - Unresolved variants such as a removed `@custom-variant` use a muted warning color when their underlying utility still validates.
 - Configured Tailwind prefixes such as `tw:` can use their own color.
 - Slash modifiers and fractions such as `/50`, `/item`, and `/2` can use their own color.
 - Square brackets in arbitrary values and variants such as `w-[317px]` and `[&>svg]:size-4` use a subtle third color.
+- Full arbitrary values such as `[317px]` and Tailwind v4 CSS-variable shorthand such as `(--brand-color)` can optionally use their own colors; both are disabled by default.
 - Important classes using a leading or trailing `!` use one foreground color across the whole class.
 - Literal class text rejected by Tailwind can optionally use a non-Tailwind color; this is disabled by default.
 
@@ -61,20 +63,28 @@ All visual colors are native VS Code theme colors and can be overridden with `wo
 {
   "workbench.colorCustomizations": {
     "tailwindClassHighlighting.utilityUnderline": "#8080805C",
-    "tailwindClassHighlighting.utility": "#C9D1D9",
     "tailwindClassHighlighting.breakpoint": "#51FFFF",
     "tailwindClassHighlighting.variant": "#2DF3AC",
+    "tailwindClassHighlighting.arbitraryVariant": "#6FC1D0",
+    "tailwindClassHighlighting.relationshipVariant": "#28E5CA",
+    "tailwindClassHighlighting.attributeVariant": "#8AC77A",
+    "tailwindClassHighlighting.pseudoElementVariant": "#87B9B1",
+    "tailwindClassHighlighting.environmentVariant": "#44D0CF",
     "tailwindClassHighlighting.unresolvedVariant": "#E5C07B",
     "tailwindClassHighlighting.prefix": "#7AA2F7",
     "tailwindClassHighlighting.modifier": "#F0A868",
     "tailwindClassHighlighting.arbitrary": "#C4A7E7",
+    "tailwindClassHighlighting.arbitraryValue": "#C4A7E7",
+    "tailwindClassHighlighting.cssVariable": "#7AA2F7",
     "tailwindClassHighlighting.important": "#FF7AC6",
     "tailwindClassHighlighting.nonTailwind": "#A0A0A0"
   }
 }
 ```
 
-Use 8-digit hex colors such as `#E5C07B80` when you want a more transparent foreground treatment.
+Use **Tailwind Class Highlighting: Configure Styles** from the Command Palette for a live visual editor. Utility and independent categories have color controls; specialized variant-family colors are derived automatically from the single Variant base color. Utility also exposes underline style and optional text coloring. The panel writes the same settings shown below, so manual `settings.json` editing remains fully supported.
+
+On editor runtimes with alpha-capable native color pickers, opacity is selected inside the color picker. Older runtimes get a compact percentage fallback. Opacity is stored in the color alpha channel; for example, `#E5C07B80` is roughly 50% opacity.
 
 The extension is intentionally focused on readability. It does not provide completion, linting, formatting, or class sorting, and is designed to work alongside the official Tailwind CSS IntelliSense extension.
 
@@ -122,9 +132,12 @@ All settings are under `tailwindClassHighlighting`:
 - `styles.utility.underlineStyle` - `dotted`, `solid`, `dashed`, `double`, or `none`.
 - `styles.utility.colorEnabled` - optionally apply the utility foreground color; disabled by default.
 - `styles.breakpoint.enabled`, `styles.variant.enabled`, `styles.unresolvedVariant.enabled`, `styles.prefix.enabled`, `styles.modifier.enabled`, `styles.arbitrary.enabled`, and `styles.important.enabled` - toggle each Tailwind visual category independently.
+- `styles.arbitraryVariant.enabled`, `styles.relationshipVariant.enabled`, `styles.attributeVariant.enabled`, `styles.pseudoElementVariant.enabled`, and `styles.environmentVariant.enabled` - opt into specialized variant families. Each falls back to `variant` when disabled, and Configure Styles derives their palette from the Variant base color.
+- `styles.arbitraryValue.enabled` - color the complete arbitrary value such as `[317px]`; disabled by default.
+- `styles.cssVariable.enabled` - color Tailwind v4 CSS-variable shorthand such as `(--brand-color)`; disabled by default.
 - `styles.nonTailwind.enabled` - opt into highlighting literal class text rejected by Tailwind; disabled by default.
 
-Run **Tailwind Class Highlighting: Configure Styles** from the Command Palette to open the extension's normal VS Code settings. Colors remain native theme colors and are customized through `workbench.colorCustomizations`.
+Run **Tailwind Class Highlighting: Configure Styles** from the Command Palette to open the live configurator. Changes are saved to User Settings. Colors remain native theme colors under `workbench.colorCustomizations`, and behavior remains under `tailwindClassHighlighting.styles.*`.
 
 ## Performance
 

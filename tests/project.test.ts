@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -87,6 +88,58 @@ describe('TailwindProjectManager', () => {
     expect(highlighted).toContainEqual({ value: 'tablet:', group: 'breakpoint' })
     expect(highlighted).toContainEqual({ value: '@card:', group: 'breakpoint' })
     expect(highlighted.some(({ value }) => value.includes('plain-custom'))).toBe(false)
+  })
+
+  it('classifies opt-in variant families through the Tailwind design system', async () => {
+    const manager = new TailwindProjectManager()
+    const project = await manager.getProject(path.join(fixtureRoot, 'src/component.js'))
+    const validator = project!.validator
+
+    expect(validator.classifyVariant('[&>svg]')).toBe('arbitraryVariant')
+    expect(validator.classifyVariant('group-hover')).toBe('relationshipVariant')
+    expect(validator.classifyVariant('data-[state=open]')).toBe('attributeVariant')
+    expect(validator.classifyVariant('before')).toBe('pseudoElementVariant')
+    expect(validator.classifyVariant('dark')).toBe('environmentVariant')
+    expect(validator.classifyVariant('supports-[display:grid]')).toBe('environmentVariant')
+    expect(validator.classifyVariant('hover')).toBeNull()
+  })
+
+  it('refreshes real Tailwind classifications and validity after custom-variant CSS edits', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'tailwind-custom-variant-refresh-'))
+    temporaryDirectories.push(root)
+    await mkdir(path.join(root, 'node_modules'), { recursive: true })
+    const require = createRequire(path.resolve('package.json'))
+    await symlink(
+      path.dirname(require.resolve('tailwindcss/package.json')),
+      path.join(root, 'node_modules/tailwindcss'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    )
+    await writeFile(path.join(root, 'package.json'), '{"private":true}')
+    const stylesheet = path.join(root, 'app.css')
+    const document = path.join(root, 'component.tsx')
+    await writeFile(stylesheet, '@import "tailwindcss";')
+    const manager = new TailwindProjectManager()
+    const original = (await manager.getProject(document, root))!.validator
+    expect(original.classifyVariant('group-hover')).toBe('relationshipVariant')
+    expect(original.classifyVariant('active-true')).toBeNull()
+    expect(original.getValidCandidates(['active-true:flex'])).toEqual(new Set())
+
+    await writeFile(
+      stylesheet,
+      '@import "tailwindcss";\n@custom-variant group-hover (&:focus);\n@custom-variant active-true (&:active);',
+    )
+    manager.invalidateAll()
+    const updated = (await manager.getProject(document, root))!.validator
+    expect(updated).not.toBe(original)
+    expect(updated.classifyVariant('group-hover')).toBeNull()
+    expect(updated.getValidCandidates(['active-true:flex'])).toEqual(new Set(['active-true:flex']))
+
+    await writeFile(stylesheet, '@import "tailwindcss";')
+    manager.invalidateAll()
+    const restored = (await manager.getProject(document, root))!.validator
+    expect(restored).not.toBe(updated)
+    expect(restored.classifyVariant('group-hover')).toBe('relationshipVariant')
+    expect(restored.getValidCandidates(['active-true:flex'])).toEqual(new Set())
   })
 
   it('uses the project prefix as syntax instead of treating it as a variant', async () => {

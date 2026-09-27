@@ -26,7 +26,7 @@ paths:
 
 CI runs install, tests, typecheck, formatting, build, and host packaging on pushes/PRs. Package workflow runs manually or on `v*` tags across all six targets and uploads artifacts. Workflows do not publish to registries.
 
-`.vscodeignore` keeps source, tests, benchmarks, wiki, scripts, secrets/env files, source maps, lockfile, and build config out of VSIX payload.
+`.vscodeignore` keeps source, tests, benchmarks, wiki, build plans, scripts, secrets/env files, source maps, lockfile, and build config out of VSIX payload.
 
 ## Registry Publishing Safety
 

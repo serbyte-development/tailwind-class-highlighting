@@ -134,3 +134,80 @@ export function findModifierRanges(
 
   return ranges
 }
+
+export function findArbitraryValueRanges(
+  candidate: string,
+  utilityStart: number,
+): CandidateRange[] {
+  const ranges: CandidateRange[] = []
+  let depth = 0
+  let start = -1
+  let quote: string | null = null
+
+  for (let i = utilityStart; i < candidate.length; i++) {
+    const char = candidate[i]
+    if (quote) {
+      if (char === '\\') i++
+      else if (char === quote) quote = null
+      continue
+    }
+    if (char === '\\') {
+      i++
+      continue
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char
+      continue
+    }
+    if (char === '[') {
+      if (depth === 0) start = i
+      depth++
+    } else if (char === ']' && depth > 0) {
+      depth--
+      if (depth === 0 && start >= 0) {
+        ranges.push({ start, end: i + 1 })
+        start = -1
+      }
+    }
+  }
+
+  return ranges
+}
+
+export function findCssVariableRanges(candidate: string, utilityStart: number): CandidateRange[] {
+  const ranges: CandidateRange[] = []
+
+  for (let i = utilityStart + 1; i < candidate.length; i++) {
+    if (candidate[i - 1] !== '-' || candidate[i] !== '(') continue
+
+    let depth = 1
+    let quote: string | null = null
+    for (let j = i + 1; j < candidate.length; j++) {
+      const char = candidate[j]
+      if (quote) {
+        if (char === '\\') j++
+        else if (char === quote) quote = null
+        continue
+      }
+      if (char === '\\') {
+        j++
+        continue
+      }
+      if (char === '"' || char === "'") {
+        quote = char
+        continue
+      }
+      if (char === '(') depth++
+      else if (char === ')' && --depth === 0) {
+        const content = candidate.slice(i + 1, j)
+        if (content.startsWith('--') || content.includes(':--')) {
+          ranges.push({ start: i, end: j + 1 })
+        }
+        i = j
+        break
+      }
+    }
+  }
+
+  return ranges
+}
