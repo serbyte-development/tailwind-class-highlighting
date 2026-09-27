@@ -7,7 +7,7 @@ import { DecorationRenderer } from './decorations'
 
 export class HighlightController implements vscode.Disposable {
   private config: HighlightConfiguration = getConfiguration()
-  private renderer = new DecorationRenderer()
+  private renderer = new DecorationRenderer(this.config.styles)
   private tailwindProjects = new TailwindProjectManager()
   private timers = new Map<vscode.TextEditor, NodeJS.Timeout>()
   private subscriptions: vscode.Disposable[] = []
@@ -51,7 +51,7 @@ export class HighlightController implements vscode.Disposable {
         }
         this.config = getConfiguration()
         this.renderer.dispose()
-        this.renderer = new DecorationRenderer()
+        this.renderer = new DecorationRenderer(this.config.styles)
         for (const editor of vscode.window.visibleTextEditors) this.schedule(editor, 0)
       }),
       vscode.workspace.onDidCloseTextDocument((document) => {
@@ -82,7 +82,8 @@ export class HighlightController implements vscode.Disposable {
     if (
       document.uri.scheme !== 'file' ||
       !this.config.enabled ||
-      !this.config.languages.has(document.languageId)
+      !this.config.languages.has(document.languageId) ||
+      this.config.styles.enabledGroups.size === 0
     ) {
       this.renderer.clear(editor)
       return
@@ -112,6 +113,7 @@ export class HighlightController implements vscode.Disposable {
         {
           classAttributes: config.classAttributes,
           classFunctions: config.classFunctions,
+          enabledGroups: config.styles.enabledGroups,
         },
         scanner,
         tailwindProject.validator,

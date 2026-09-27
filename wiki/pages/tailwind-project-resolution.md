@@ -17,7 +17,7 @@ Only Tailwind v4 loads. CSS entrypoints use exact `@import "tailwindcss"` anchor
 
 Project loader calls Tailwind's `__unstable__loadDesignSystem`, using project-relative stylesheet/module loading. This can execute modules referenced through Tailwind `@plugin` or `@config`, matching Tailwind tooling behavior.
 
-Validator uses `candidatesToCss()` for complete-candidate validity and caches results per loaded design system. Breakpoint/container classification combines design-system variant metadata with supported arbitrary breakpoint syntax.
+Validator uses `candidatesToCss()` for complete-candidate validity and caches results per loaded design system. It also exposes the design system's configured prefix so analysis can distinguish prefix syntax from variants. Breakpoint/container classification combines design-system variant metadata with supported arbitrary breakpoint syntax.
 
 ## Caching and Failure
 

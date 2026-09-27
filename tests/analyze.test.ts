@@ -2,6 +2,7 @@ import * as path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { Scanner } from '@tailwindcss/oxide'
 import { analyzeText } from '../src/core/analyze'
+import { highlightGroups } from '../src/core/types'
 import type { CandidateValidator } from '../src/core/validator'
 import { TailwindProjectManager } from '../src/tailwind/project'
 
@@ -117,6 +118,7 @@ describe('analyzeText', () => {
         )
       },
       isBreakpointVariant: () => false,
+      getPrefix: () => null,
     }
     const text = `<div className="missing:hover:bg-red-500 missing:focus:bg-red-500" />`
 
@@ -157,6 +159,73 @@ describe('analyzeText', () => {
       { value: '[', group: 'arbitrary' },
       { value: ']', group: 'arbitrary' },
     ])
+  })
+
+  it('highlights slash modifiers without treating slashes inside arbitrary values as modifiers', () => {
+    const text = `<div className="group-hover/item:bg-red-500/50 w-1/2 bg-[url(/x.svg)]" />`
+    const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted.filter(({ group }) => group === 'modifier')).toEqual([
+      { value: '/item', group: 'modifier' },
+      { value: '/50', group: 'modifier' },
+      { value: '/2', group: 'modifier' },
+    ])
+    expect(highlighted).not.toContainEqual({ value: '/x.svg', group: 'modifier' })
+  })
+
+  it('can opt into non-Tailwind class highlighting without styling expression identifiers', () => {
+    const text = `<div className={condition ? "flex custom-card" : variableName} />`
+    const highlighted = analyzeText(
+      text,
+      { ...options, enabledGroups: new Set(highlightGroups) },
+      scanner,
+      validator,
+    ).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({ value: 'custom-card', group: 'nonTailwind' })
+    expect(highlighted.some(({ value }) => value === 'condition')).toBe(false)
+    expect(highlighted.some(({ value }) => value === 'variableName')).toBe(false)
+  })
+
+  it('does not classify comparison string operands as non-Tailwind classes', () => {
+    const text = `<div className={state === "custom-state" ? "flex custom-card" : "grid"} />`
+    const highlighted = analyzeText(
+      text,
+      { ...options, enabledGroups: new Set(highlightGroups) },
+      scanner,
+      validator,
+    ).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({ value: 'custom-card', group: 'nonTailwind' })
+    expect(highlighted.some(({ value }) => value === 'custom-state')).toBe(false)
+  })
+
+  it('respects enabled groups and reveals constituent styles when important is disabled', () => {
+    const text = `<div className="hover:!mt-4 md:bg-red-500/50" />`
+    const highlighted = analyzeText(
+      text,
+      { ...options, enabledGroups: new Set(['utility', 'variant', 'modifier']) },
+      scanner,
+      validator,
+    ).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({ value: 'hover:', group: 'variant' })
+    expect(highlighted).toContainEqual({ value: '!mt-4', group: 'utility' })
+    expect(highlighted).toContainEqual({ value: '/50', group: 'modifier' })
+    expect(highlighted.some(({ group }) => group === 'breakpoint')).toBe(false)
+    expect(highlighted.some(({ group }) => group === 'important')).toBe(false)
   })
 })
 

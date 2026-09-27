@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Highlight unresolved Tailwind variants with a muted warning color when the underlying utility remains valid, including removed project `@custom-variant` definitions.
+- Add configurable enable/disable settings for every visual category.
+- Add configurable utility underline styles and optional utility foreground coloring while keeping the default dotted underline with normal editor text color.
+- Add project-aware Tailwind prefix highlighting and slash modifier/fraction highlighting.
+- Add optional non-Tailwind class highlighting, disabled by default and constrained to literal class text so surrounding expression identifiers stay untouched.
+- Add `Tailwind Class Highlighting: Configure Styles` to open the extension's normal VS Code settings.
 
 ## 0.1.0
 

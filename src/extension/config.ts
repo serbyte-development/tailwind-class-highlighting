@@ -1,4 +1,13 @@
 import * as vscode from 'vscode'
+import type { HighlightGroup } from '../core/types'
+
+export type UtilityUnderlineStyle = 'dotted' | 'solid' | 'dashed' | 'double' | 'none'
+
+export interface HighlightStyleConfiguration {
+  enabledGroups: ReadonlySet<HighlightGroup>
+  utilityUnderlineStyle: UtilityUnderlineStyle
+  utilityColorEnabled: boolean
+}
 
 export interface HighlightConfiguration {
   enabled: boolean
@@ -6,10 +15,52 @@ export interface HighlightConfiguration {
   classAttributes: string[]
   classFunctions: string[]
   debounceMs: number
+  styles: HighlightStyleConfiguration
 }
 
 function unique(values: string[]): string[] {
   return [...new Set(values)]
+}
+
+const styleDefaults: Record<HighlightGroup, boolean> = {
+  utility: true,
+  breakpoint: true,
+  variant: true,
+  unresolvedVariant: true,
+  prefix: true,
+  modifier: true,
+  arbitrary: true,
+  important: true,
+  nonTailwind: false,
+}
+
+const underlineStyles = new Set<UtilityUnderlineStyle>([
+  'dotted',
+  'solid',
+  'dashed',
+  'double',
+  'none',
+])
+
+function getStyleConfiguration(config: vscode.WorkspaceConfiguration): HighlightStyleConfiguration {
+  const enabledGroups = new Set<HighlightGroup>()
+
+  for (const [group, defaultEnabled] of Object.entries(styleDefaults) as Array<
+    [HighlightGroup, boolean]
+  >) {
+    if (config.get(`styles.${group}.enabled`, defaultEnabled)) enabledGroups.add(group)
+  }
+
+  const underlineStyle = config.get<UtilityUnderlineStyle>(
+    'styles.utility.underlineStyle',
+    'dotted',
+  )
+
+  return {
+    enabledGroups,
+    utilityUnderlineStyle: underlineStyles.has(underlineStyle) ? underlineStyle : 'dotted',
+    utilityColorEnabled: config.get('styles.utility.colorEnabled', false),
+  }
 }
 
 export function getConfiguration(): HighlightConfiguration {
@@ -58,5 +109,6 @@ export function getConfiguration(): HighlightConfiguration {
       ...tailwindConfig.get<string[]>('classFunctions', []),
     ]),
     debounceMs: Math.max(0, Math.min(250, config.get('debounceMs', 25))),
+    styles: getStyleConfiguration(config),
   }
 }

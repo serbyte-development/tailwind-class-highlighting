@@ -10,6 +10,7 @@ const fixtureRoot = path.resolve('tests/fixtures/tailwind-v4')
 const monorepoRoot = path.resolve('tests/fixtures/tailwind-monorepo')
 const brokenFixtureRoot = path.resolve('tests/fixtures/tailwind-v4-broken')
 const ambiguousFixtureRoot = path.resolve('tests/fixtures/tailwind-v4-ambiguous')
+const prefixFixtureRoot = path.resolve('tests/fixtures/tailwind-v4-prefix')
 const temporaryDirectories: string[] = []
 
 afterEach(async () => {
@@ -86,6 +87,35 @@ describe('TailwindProjectManager', () => {
     expect(highlighted).toContainEqual({ value: 'tablet:', group: 'breakpoint' })
     expect(highlighted).toContainEqual({ value: '@card:', group: 'breakpoint' })
     expect(highlighted.some(({ value }) => value.includes('plain-custom'))).toBe(false)
+  })
+
+  it('uses the project prefix as syntax instead of treating it as a variant', async () => {
+    const manager = new TailwindProjectManager()
+    const project = await manager.getProject(path.join(prefixFixtureRoot, 'src/component.js'))
+    const scanner = await getCandidateScanner()
+
+    expect(project?.validator.getPrefix()).toBe('tw')
+    expect(
+      project?.validator.getValidCandidates(['tw:flex', 'tw:hover:bg-red-500', 'bg-red-500']),
+    ).toEqual(new Set(['tw:flex', 'tw:hover:bg-red-500']))
+
+    const text = `<div className="tw:hover:bg-red-500 tw:active-true:bg-red-500 bg-red-500" />`
+    const highlighted = analyzeText(
+      text,
+      { classAttributes: ['className'], classFunctions: [] },
+      scanner,
+      project!.validator,
+    ).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({ value: 'tw:', group: 'prefix' })
+    expect(highlighted).toContainEqual({ value: 'hover:', group: 'variant' })
+    expect(highlighted).toContainEqual({ value: 'active-true:', group: 'unresolvedVariant' })
+    expect(
+      highlighted.some(({ value, group }) => value === 'bg-red-500' && group === 'nonTailwind'),
+    ).toBe(false)
   })
 
   it('keeps multiple Tailwind entrypoints in one package isolated', async () => {

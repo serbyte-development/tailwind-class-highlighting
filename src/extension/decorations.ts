@@ -1,67 +1,57 @@
 import * as vscode from 'vscode'
-import type { HighlightSpan } from '../core/types'
+import { highlightGroups, type HighlightSpan } from '../core/types'
+import type { HighlightStyleConfiguration, UtilityUnderlineStyle } from './config'
 
 type RenderGroup = HighlightSpan['group']
 
-const renderGroups: RenderGroup[] = [
-  'utility',
-  'breakpoint',
-  'variant',
-  'arbitrary',
-  'important',
-  'unresolvedVariant',
-]
+const foregroundThemeColors: Record<Exclude<RenderGroup, 'utility'>, string> = {
+  breakpoint: 'tailwindClassHighlighting.breakpoint',
+  variant: 'tailwindClassHighlighting.variant',
+  unresolvedVariant: 'tailwindClassHighlighting.unresolvedVariant',
+  prefix: 'tailwindClassHighlighting.prefix',
+  modifier: 'tailwindClassHighlighting.modifier',
+  arbitrary: 'tailwindClassHighlighting.arbitrary',
+  important: 'tailwindClassHighlighting.important',
+  nonTailwind: 'tailwindClassHighlighting.nonTailwind',
+}
 
-function dottedUnderline(): vscode.DecorationRenderOptions {
-  return {
-    borderColor: new vscode.ThemeColor('tailwindClassHighlighting.utilityUnderline'),
-    borderStyle: 'dotted',
-    borderWidth: '0 0 1px 0',
+function utilityDecoration(
+  underlineStyle: UtilityUnderlineStyle,
+  colorEnabled: boolean,
+): vscode.DecorationRenderOptions {
+  const options: vscode.DecorationRenderOptions = {}
+
+  if (underlineStyle !== 'none') {
+    options.borderColor = new vscode.ThemeColor('tailwindClassHighlighting.utilityUnderline')
+    options.borderStyle = underlineStyle
+    options.borderWidth = underlineStyle === 'double' ? '0 0 3px 0' : '0 0 1px 0'
   }
+
+  if (colorEnabled) options.color = new vscode.ThemeColor('tailwindClassHighlighting.utility')
+  return options
 }
 
 export class DecorationRenderer implements vscode.Disposable {
   private decorations = new Map<RenderGroup, vscode.TextEditorDecorationType>()
   private signatures = new WeakMap<vscode.TextEditor, Map<RenderGroup, string>>()
 
-  constructor() {
-    this.decorations.set('utility', vscode.window.createTextEditorDecorationType(dottedUnderline()))
-    this.decorations.set(
-      'breakpoint',
-      vscode.window.createTextEditorDecorationType({
-        color: new vscode.ThemeColor('tailwindClassHighlighting.breakpoint'),
-      }),
-    )
-    this.decorations.set(
-      'variant',
-      vscode.window.createTextEditorDecorationType({
-        color: new vscode.ThemeColor('tailwindClassHighlighting.variant'),
-      }),
-    )
-    this.decorations.set(
-      'unresolvedVariant',
-      vscode.window.createTextEditorDecorationType({
-        color: new vscode.ThemeColor('tailwindClassHighlighting.unresolvedVariant'),
-      }),
-    )
-    this.decorations.set(
-      'arbitrary',
-      vscode.window.createTextEditorDecorationType({
-        color: new vscode.ThemeColor('tailwindClassHighlighting.arbitrary'),
-      }),
-    )
-    this.decorations.set(
-      'important',
-      vscode.window.createTextEditorDecorationType({
-        color: new vscode.ThemeColor('tailwindClassHighlighting.important'),
-      }),
-    )
+  constructor(styles: HighlightStyleConfiguration) {
+    for (const group of highlightGroups) {
+      if (!styles.enabledGroups.has(group)) continue
+
+      const options =
+        group === 'utility'
+          ? utilityDecoration(styles.utilityUnderlineStyle, styles.utilityColorEnabled)
+          : { color: new vscode.ThemeColor(foregroundThemeColors[group]) }
+      this.decorations.set(group, vscode.window.createTextEditorDecorationType(options))
+    }
   }
 
   apply(editor: vscode.TextEditor, spans: HighlightSpan[]): void {
+    const renderGroups = [...this.decorations.keys()]
     const grouped = new Map<RenderGroup, HighlightSpan[]>(renderGroups.map((group) => [group, []]))
 
-    for (const span of spans) grouped.get(span.group)!.push(span)
+    for (const span of spans) grouped.get(span.group)?.push(span)
 
     let editorSignatures = this.signatures.get(editor)
     if (!editorSignatures) {

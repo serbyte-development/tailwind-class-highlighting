@@ -7,6 +7,7 @@ import type { CandidateValidator } from '../core/validator'
 interface TailwindDesignSystem {
   candidatesToCss(classes: string[]): Array<string | null>
   getVariants?(): Array<{ name: string; values: string[] }>
+  theme?: { prefix: string | null }
 }
 
 interface TailwindModule {
@@ -111,6 +112,10 @@ class DesignSystemValidator implements CandidateValidator {
     }
 
     return false
+  }
+
+  getPrefix(): string | null {
+    return this.designSystem.theme?.prefix ?? null
   }
 }
 

@@ -22,10 +22,11 @@ Make dense Tailwind CSS v4 class lists easier to read in VS Code, Cursor, and co
 - **See responsive changes immediately.** Breakpoints and container-query variants stand out from normal utilities.
 - **Separate behavior from layout.** `hover:`, `focus:`, `dark:`, `data-*`, `aria-*`, and other variants use their own color.
 - **Catch inactive custom variants.** Unresolved variants stay visible with a muted warning color when the utility after them is still valid Tailwind.
+- **See prefixes and modifiers.** Project prefixes and slash modifiers such as `/50`, `/item`, and fractions get their own optional visual treatment.
 - **Spot arbitrary values quickly.** Only the square brackets in values such as `w-[317px]` are colored.
 - **Make important classes obvious.** Classes using `!` get one foreground treatment across the whole candidate.
 - **Keep normal utilities calm.** Recognized utilities keep the editor's normal text color and receive only a faint dotted underline.
-- **Leave ordinary custom classes alone.** Custom classes without Tailwind variant syntax are not styled.
+- **Leave ordinary custom classes alone by default.** Optional non-Tailwind highlighting can color literal class text rejected by Tailwind.
 - **Follow your actual Tailwind project.** Tailwind v4 utilities, theme values, custom variants, custom breakpoints, and `@utility` definitions are validated by the project's own Tailwind installation.
 
 **Requires Tailwind CSS v4.** Tailwind CSS v3 and earlier are intentionally unsupported.
@@ -44,11 +45,13 @@ Tailwind Class Highlighting adds just enough visual structure to make those clas
 - Breakpoint variants such as `sm:`, `md:`, `max-lg:`, and container-query breakpoints use a distinct color.
 - State and behavior variants such as `hover:`, `focus:`, `dark:`, `data-*`, and `aria-*` use a second color.
 - Unresolved variants such as a removed `@custom-variant` use a muted warning color when their underlying utility still validates.
+- Configured Tailwind prefixes such as `tw:` can use their own color.
+- Slash modifiers and fractions such as `/50`, `/item`, and `/2` can use their own color.
 - Square brackets in arbitrary values and variants such as `w-[317px]` and `[&>svg]:size-4` use a subtle third color.
 - Important classes using a leading or trailing `!` use one foreground color across the whole class.
-- Ordinary custom classes without Tailwind variant syntax are left unchanged.
+- Literal class text rejected by Tailwind can optionally use a non-Tailwind color; this is disabled by default.
 
-Important styling takes foreground precedence over breakpoint, state, and arbitrary-bracket colors. Theme defaults are provided for light, dark, and high-contrast themes.
+Important styling takes foreground precedence while enabled. Disabling important styling reveals the enabled prefix, variant, modifier, and arbitrary treatments underneath. Theme defaults are provided for light, dark, and high-contrast themes.
 
 ### Theme colors
 
@@ -58,14 +61,20 @@ All visual colors are native VS Code theme colors and can be overridden with `wo
 {
   "workbench.colorCustomizations": {
     "tailwindClassHighlighting.utilityUnderline": "#8080805C",
+    "tailwindClassHighlighting.utility": "#C9D1D9",
     "tailwindClassHighlighting.breakpoint": "#51FFFF",
     "tailwindClassHighlighting.variant": "#2DF3AC",
     "tailwindClassHighlighting.unresolvedVariant": "#E5C07B",
+    "tailwindClassHighlighting.prefix": "#7AA2F7",
+    "tailwindClassHighlighting.modifier": "#F0A868",
     "tailwindClassHighlighting.arbitrary": "#C4A7E7",
-    "tailwindClassHighlighting.important": "#FF7AC6"
+    "tailwindClassHighlighting.important": "#FF7AC6",
+    "tailwindClassHighlighting.nonTailwind": "#A0A0A0"
   }
 }
 ```
+
+Use 8-digit hex colors such as `#E5C07B80` when you want a more transparent foreground treatment.
 
 The extension is intentionally focused on readability. It does not provide completion, linting, formatting, or class sorting, and is designed to work alongside the official Tailwind CSS IntelliSense extension.
 
@@ -109,10 +118,17 @@ All settings are under `tailwindClassHighlighting`:
 - `classAttributes` - additional class-bearing attributes.
 - `classFunctions` - regular-expression patterns for class helper functions or tagged templates.
 - `debounceMs` - edit debounce from 0 to 250 ms.
+- `styles.utility.enabled` - enable utility highlighting.
+- `styles.utility.underlineStyle` - `dotted`, `solid`, `dashed`, `double`, or `none`.
+- `styles.utility.colorEnabled` - optionally apply the utility foreground color; disabled by default.
+- `styles.breakpoint.enabled`, `styles.variant.enabled`, `styles.unresolvedVariant.enabled`, `styles.prefix.enabled`, `styles.modifier.enabled`, `styles.arbitrary.enabled`, and `styles.important.enabled` - toggle each Tailwind visual category independently.
+- `styles.nonTailwind.enabled` - opt into highlighting literal class text rejected by Tailwind; disabled by default.
+
+Run **Tailwind Class Highlighting: Configure Styles** from the Command Palette to open the extension's normal VS Code settings. Colors remain native theme colors and are customized through `workbench.colorCustomizations`.
 
 ## Performance
 
-The extension scans only class-bearing source regions, performs one Oxide scan per update, caches project/design-system resolution, caches candidate validity inside each loaded design system, batches ranges by visual treatment, and skips decoration calls whose ranges did not change. Unresolved-variant detection adds one deduplicated validation batch only when an invalid candidate contains variants. Oxide and project-local Tailwind loading happen only when a supported editor actually needs highlighting.
+The extension scans only class-bearing source regions, performs one Oxide scan per update, caches project/design-system resolution, caches candidate validity inside each loaded design system, batches ranges by visual treatment, and skips decoration calls whose ranges did not change. Unresolved-variant detection adds one deduplicated validation batch only when an invalid candidate contains variants. Literal-range tracking for non-Tailwind classes runs only when that opt-in style is enabled. Oxide and project-local Tailwind loading happen only when a supported editor actually needs highlighting.
 
 The synthetic dense-file benchmark can be run with:
 

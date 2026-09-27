@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findSourceRegions } from '../src/core/regions'
+import { findClassTextRegions, findSourceRegions } from '../src/core/regions'
 
 const options = {
   classAttributes: ['class', 'className', 'class:list', ':class'],
@@ -45,4 +45,42 @@ it('keeps tagged templates intact across interpolated templates', () => {
   )
 
   expect(values).toContain('flex ${active ? `bg-red-500` : "p-2"} grid')
+})
+
+it('isolates literal class text from surrounding expression identifiers', () => {
+  const text = `<div className={condition ? "flex custom-card" : variableName} />; const x = cn("grid", active && \`gap-2 \${size ? "p-4" : customVar}\`)`
+  const sourceRegions = findSourceRegions(text, options)
+  const values = findClassTextRegions(text, sourceRegions).map((region) =>
+    text.slice(region.start, region.end),
+  )
+
+  expect(values).toContain('flex custom-card')
+  expect(values).toContain('grid')
+  expect(values).toContain('gap-2 ')
+  expect(values).toContain('p-4')
+  expect(values.some((value) => value.includes('condition'))).toBe(false)
+  expect(values.some((value) => value.includes('variableName'))).toBe(false)
+  expect(values.some((value) => value.includes('customVar'))).toBe(false)
+})
+
+it('treats quoted bound-class attributes as expressions and keeps only nested class strings', () => {
+  const text = `<div :class="{ active: isActive, 'custom-card': enabled }" />`
+  const sourceRegions = findSourceRegions(text, options)
+  const values = findClassTextRegions(text, sourceRegions).map((region) =>
+    text.slice(region.start, region.end),
+  )
+
+  expect(values).toEqual(['custom-card'])
+})
+
+it('does not treat comparison string operands as class text', () => {
+  const text = `<div className={state === "custom-state" ? "flex custom-card" : "grid"} />`
+  const sourceRegions = findSourceRegions(text, options)
+  const values = findClassTextRegions(text, sourceRegions).map((region) =>
+    text.slice(region.start, region.end),
+  )
+
+  expect(values).toContain('flex custom-card')
+  expect(values).toContain('grid')
+  expect(values).not.toContain('custom-state')
 })

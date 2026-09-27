@@ -15,3 +15,7 @@ Extension keeps `@tailwindcss/oxide` as lazy candidate scanner because a user's 
 ## 2026-08-11 — Registry publishing remained manual after v0.1.0
 
 Visual Studio Marketplace `v0.1.0` was released as six platform-specific packages. Registry writes remain explicit user-approved actions: approve exact version and registry immediately before publish, submit packages sequentially, inspect each result, and stop on first error. Automatic retries are prohibited.
+
+## 2026-09-26 — Style controls stay native and restrained by default
+
+Per-category behavior lives in normal VS Code settings while colors remain VS Code theme-color contribution points. Utility foreground coloring is opt-in so the default remains a faint underline, and non-Tailwind highlighting is opt-in because Tailwind-rejected classes can be intentional project CSS. The configuration command opens native extension settings instead of introducing a second custom settings system.

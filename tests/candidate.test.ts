@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   findArbitraryBracketRanges,
   findImportantModifierRanges,
+  findModifierRanges,
   splitCandidate,
 } from '../src/core/candidate'
 
@@ -39,5 +40,15 @@ describe('candidate emphasis ranges', () => {
   it('finds leading and trailing important modifiers', () => {
     expect(findImportantModifierRanges('hover:!mt-4', 6)).toEqual([{ start: 6, end: 7 }])
     expect(findImportantModifierRanges('bg-red-500!', 0)).toEqual([{ start: 10, end: 11 }])
+  })
+
+  it('finds top-level slash modifiers while ignoring slashes inside arbitrary syntax', () => {
+    const candidate = 'group-hover/item:bg-[url(/x.svg)]/50'
+    expect(findModifierRanges(candidate)).toEqual([
+      { start: 11, end: 16 },
+      { start: 33, end: 36 },
+    ])
+    expect(findModifierRanges('w-1/2')).toEqual([{ start: 3, end: 5 }])
+    expect(findModifierRanges(String.raw`bg-[foo\]bar/baz]`)).toEqual([])
   })
 })

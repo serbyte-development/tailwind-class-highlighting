@@ -3,8 +3,11 @@ export const highlightGroups = [
   'breakpoint',
   'variant',
   'unresolvedVariant',
+  'prefix',
+  'modifier',
   'arbitrary',
   'important',
+  'nonTailwind',
 ] as const
 
 export type HighlightGroup = (typeof highlightGroups)[number]

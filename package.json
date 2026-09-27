@@ -54,12 +54,22 @@
     "colors": [
       {
         "id": "tailwindClassHighlighting.utilityUnderline",
-        "description": "Dotted underline color for recognized Tailwind utility classes.",
+        "description": "Underline color for recognized Tailwind utility classes.",
         "defaults": {
           "dark": "#8080805C",
           "light": "#8080805C",
           "highContrast": "#FFFFFF99",
           "highContrastLight": "#00000099"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.utility",
+        "description": "Optional foreground color for recognized Tailwind utility classes.",
+        "defaults": {
+          "dark": "#C9D1D9",
+          "light": "#334155",
+          "highContrast": "#FFFFFF",
+          "highContrastLight": "#000000"
         }
       },
       {
@@ -93,6 +103,26 @@
         }
       },
       {
+        "id": "tailwindClassHighlighting.prefix",
+        "description": "Foreground color for a configured Tailwind prefix.",
+        "defaults": {
+          "dark": "#7AA2F7",
+          "light": "#315BB5",
+          "highContrast": "#8FB3FF",
+          "highContrastLight": "#24478F"
+        }
+      },
+      {
+        "id": "tailwindClassHighlighting.modifier",
+        "description": "Foreground color for Tailwind slash modifiers and fractions.",
+        "defaults": {
+          "dark": "#F0A868",
+          "light": "#9A4D00",
+          "highContrast": "#FFD166",
+          "highContrastLight": "#7A3D00"
+        }
+      },
+      {
         "id": "tailwindClassHighlighting.arbitrary",
         "description": "Foreground color for square brackets in Tailwind arbitrary variants and values.",
         "defaults": {
@@ -111,6 +141,23 @@
           "highContrast": "#FF9ED6",
           "highContrastLight": "#8A004A"
         }
+      },
+      {
+        "id": "tailwindClassHighlighting.nonTailwind",
+        "description": "Foreground color for opt-in highlighting of class text rejected by Tailwind.",
+        "defaults": {
+          "dark": "#A0A0A0",
+          "light": "#6B7280",
+          "highContrast": "#CCCCCC",
+          "highContrastLight": "#555555"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "tailwindClassHighlighting.configureStyles",
+        "title": "Configure Styles",
+        "category": "Tailwind Class Highlighting"
       }
     ],
     "configuration": {
@@ -119,7 +166,7 @@
         "tailwindClassHighlighting.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable Tailwind utility highlighting."
+          "description": "Enable Tailwind class highlighting."
         },
         "tailwindClassHighlighting.languages": {
           "type": "array",
@@ -176,6 +223,68 @@
           "minimum": 0,
           "maximum": 250,
           "description": "Delay before rescanning after an edit."
+        },
+        "tailwindClassHighlighting.styles.utility.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable highlighting for recognized Tailwind utilities."
+        },
+        "tailwindClassHighlighting.styles.utility.underlineStyle": {
+          "type": "string",
+          "enum": [
+            "dotted",
+            "solid",
+            "dashed",
+            "double",
+            "none"
+          ],
+          "default": "dotted",
+          "description": "Underline style for recognized Tailwind utilities."
+        },
+        "tailwindClassHighlighting.styles.utility.colorEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Apply the tailwindClassHighlighting.utility foreground color to recognized utilities."
+        },
+        "tailwindClassHighlighting.styles.breakpoint.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable foreground highlighting for breakpoint and container-query variants."
+        },
+        "tailwindClassHighlighting.styles.variant.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable foreground highlighting for state and behavior variants."
+        },
+        "tailwindClassHighlighting.styles.unresolvedVariant.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable warning highlighting for unresolved variants whose utility still validates."
+        },
+        "tailwindClassHighlighting.styles.prefix.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable foreground highlighting for the project's configured Tailwind prefix."
+        },
+        "tailwindClassHighlighting.styles.modifier.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable foreground highlighting for slash modifiers and fractions such as /50, /item, and /2."
+        },
+        "tailwindClassHighlighting.styles.arbitrary.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable foreground highlighting for square brackets in arbitrary values and variants."
+        },
+        "tailwindClassHighlighting.styles.important.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable whole-candidate foreground highlighting for important Tailwind classes."
+        },
+        "tailwindClassHighlighting.styles.nonTailwind.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Highlight literal class text that the active Tailwind project rejects. Disabled by default because custom CSS classes can be intentional."
         }
       }
     }

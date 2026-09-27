@@ -1,14 +1,17 @@
 import {
   findArbitraryBracketRanges,
   findImportantModifierRanges,
+  findModifierRanges,
   splitCandidate,
 } from './candidate'
-import { findSourceRegions, type RegionOptions } from './regions'
+import { findClassTextRegions, findSourceRegions, type RegionOptions } from './regions'
 import type { CandidateScanner } from './scanner'
-import type { HighlightSpan, SourceRegion } from './types'
+import type { HighlightGroup, HighlightSpan, SourceRegion } from './types'
 import type { CandidateValidator } from './validator'
 
-export type AnalyzeOptions = RegionOptions
+export interface AnalyzeOptions extends RegionOptions {
+  enabledGroups?: ReadonlySet<HighlightGroup>
+}
 
 interface BufferRegion {
   bufferStart: number
@@ -20,6 +23,18 @@ interface ClassifiedVariant {
   start: number
   end: number
   group: HighlightSpan['group']
+}
+
+interface CandidateSyntax {
+  parts: ReturnType<typeof splitCandidate>
+  prefixRange: SourceRegion | null
+  arbitraryRanges: SourceRegion[]
+  modifierRanges: SourceRegion[]
+  important: boolean
+}
+
+function isGroupEnabled(options: AnalyzeOptions, group: HighlightGroup): boolean {
+  return options.enabledGroups?.has(group) ?? group !== 'nonTailwind'
 }
 
 function mergeRegions(regions: SourceRegion[]): SourceRegion[] {
@@ -78,6 +93,37 @@ function mapToSource(regions: BufferRegion[], start: number, end: number): numbe
   return null
 }
 
+function isContainedBy(regions: SourceRegion[], start: number, end: number): boolean {
+  let low = 0
+  let high = regions.length - 1
+
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    const region = regions[mid]!
+
+    if (start < region.start) high = mid - 1
+    else if (start >= region.end) low = mid + 1
+    else return end <= region.end
+  }
+
+  return false
+}
+
+function getPrefixRange(
+  candidate: string,
+  parts: ReturnType<typeof splitCandidate>,
+  prefix: string | null,
+): SourceRegion | null {
+  if (!prefix) return null
+  const first = parts.variantRanges[0]
+  if (!first) return null
+  return candidate.slice(first.start, first.end - 1) === prefix ? first : null
+}
+
+function buildVariantProbe(prefix: string | null, variant: string, utility: string): string {
+  return prefix ? `${prefix}:${variant}${utility}` : `${variant}${utility}`
+}
+
 function addSpan(
   highlights: Map<string, HighlightSpan>,
   sourceStart: number,
@@ -99,8 +145,11 @@ export function analyzeText(
   scanner: CandidateScanner,
   validator: CandidateValidator,
 ): HighlightSpan[] {
-  const sourceRegions = mergeRegions(findSourceRegions(text, options))
+  const discoveredRegions = findSourceRegions(text, options)
+  const sourceRegions = mergeRegions(discoveredRegions)
   if (sourceRegions.length === 0) return []
+  const nonTailwindEnabled = isGroupEnabled(options, 'nonTailwind')
+  const classTextRegions = nonTailwindEnabled ? findClassTextRegions(text, discoveredRegions) : []
 
   const scanBuffer = buildScanBuffer(text, sourceRegions)
   const candidates = scanner.getCandidatesWithPositions({
@@ -109,23 +158,45 @@ export function analyzeText(
   })
   const uniqueCandidates = [...new Set(candidates.map(({ candidate }) => candidate))]
   const validCandidates = validator.getValidCandidates(uniqueCandidates)
-  const candidateParts = new Map(
-    uniqueCandidates.map((candidate) => [candidate, splitCandidate(candidate)]),
+  const prefix = validator.getPrefix()
+  const arbitraryEnabled = isGroupEnabled(options, 'arbitrary')
+  const modifierEnabled = isGroupEnabled(options, 'modifier')
+  const importantEnabled = isGroupEnabled(options, 'important')
+  const candidateSyntax = new Map<string, CandidateSyntax>(
+    uniqueCandidates.map((candidate) => {
+      const parts = splitCandidate(candidate)
+      return [
+        candidate,
+        {
+          parts,
+          prefixRange: getPrefixRange(candidate, parts, prefix),
+          arbitraryRanges: arbitraryEnabled ? findArbitraryBracketRanges(candidate) : [],
+          modifierRanges: modifierEnabled ? findModifierRanges(candidate, parts) : [],
+          important:
+            importantEnabled &&
+            findImportantModifierRanges(candidate, parts.utilityStart).length > 0,
+        },
+      ]
+    }),
   )
   const probeCandidates = new Set<string>()
 
   for (const candidate of uniqueCandidates) {
     if (validCandidates.has(candidate)) continue
 
-    const parts = candidateParts.get(candidate)!
-    if (parts.variantRanges.length === 0) continue
+    const { parts, prefixRange } = candidateSyntax.get(candidate)!
+    if (prefix && !prefixRange) continue
+    const variants = prefixRange ? parts.variantRanges.slice(1) : parts.variantRanges
+    if (variants.length === 0) continue
 
     const utility = candidate.slice(parts.utilityStart)
     if (!utility) continue
 
-    probeCandidates.add(utility)
-    for (const variant of parts.variantRanges) {
-      probeCandidates.add(candidate.slice(variant.start, variant.end) + utility)
+    probeCandidates.add(prefix ? `${prefix}:${utility}` : utility)
+    for (const variant of variants) {
+      probeCandidates.add(
+        buildVariantProbe(prefix, candidate.slice(variant.start, variant.end), utility),
+      )
     }
   }
 
@@ -138,12 +209,15 @@ export function analyzeText(
   for (const candidate of uniqueCandidates) {
     if (validCandidates.has(candidate)) continue
 
-    const parts = candidateParts.get(candidate)!
+    const { parts, prefixRange } = candidateSyntax.get(candidate)!
+    if (prefix && !prefixRange) continue
+    const variantRanges = prefixRange ? parts.variantRanges.slice(1) : parts.variantRanges
     const utility = candidate.slice(parts.utilityStart)
-    if (!validProbeCandidates.has(utility)) continue
+    const utilityProbe = prefix ? `${prefix}:${utility}` : utility
+    if (!validProbeCandidates.has(utilityProbe)) continue
 
-    const variants = parts.variantRanges.map((variant): ClassifiedVariant => {
-      const probe = candidate.slice(variant.start, variant.end) + utility
+    const variants = variantRanges.map((variant): ClassifiedVariant => {
+      const probe = buildVariantProbe(prefix, candidate.slice(variant.start, variant.end), utility)
       if (!validProbeCandidates.has(probe)) return { ...variant, group: 'unresolvedVariant' }
 
       const variantName = candidate.slice(variant.start, variant.end - 1)
@@ -164,56 +238,100 @@ export function analyzeText(
     const sourceStart = mapToSource(scanBuffer.regions, bufferStart, bufferStart + candidate.length)
     if (sourceStart == null) continue
 
-    const parts = candidateParts.get(candidate)!
+    const syntax = candidateSyntax.get(candidate)!
+    const { parts, prefixRange } = syntax
 
     if (!validCandidates.has(candidate)) {
       const variants = unresolvedCandidates.get(candidate)
-      if (!variants) continue
+      if (!variants) {
+        if (
+          nonTailwindEnabled &&
+          isContainedBy(classTextRegions, sourceStart, sourceStart + candidate.length)
+        ) {
+          addSpan(highlights, sourceStart, 0, candidate.length, 'nonTailwind')
+        }
+        continue
+      }
+
+      if (prefixRange && isGroupEnabled(options, 'prefix')) {
+        addSpan(highlights, sourceStart, prefixRange.start, prefixRange.end, 'prefix')
+      }
 
       for (const variant of variants) {
-        addSpan(highlights, sourceStart, variant.start, variant.end, variant.group)
-      }
-
-      for (const range of findArbitraryBracketRanges(candidate)) {
-        if (
-          variants.some(
-            (variant) =>
-              variant.group === 'unresolvedVariant' &&
-              range.start >= variant.start &&
-              range.end <= variant.end,
-          )
-        ) {
-          continue
+        if (isGroupEnabled(options, variant.group)) {
+          addSpan(highlights, sourceStart, variant.start, variant.end, variant.group)
         }
-        addSpan(highlights, sourceStart, range.start, range.end, 'arbitrary')
       }
 
-      addSpan(highlights, sourceStart, parts.utilityStart, candidate.length, 'utility')
+      if (arbitraryEnabled) {
+        for (const range of syntax.arbitraryRanges) {
+          if (
+            variants.some(
+              (variant) =>
+                variant.group === 'unresolvedVariant' &&
+                range.start >= variant.start &&
+                range.end <= variant.end,
+            )
+          ) {
+            continue
+          }
+          addSpan(highlights, sourceStart, range.start, range.end, 'arbitrary')
+        }
+      }
+
+      if (modifierEnabled) {
+        for (const range of syntax.modifierRanges) {
+          if (
+            variants.some(
+              (variant) =>
+                variant.group === 'unresolvedVariant' &&
+                range.start >= variant.start &&
+                range.end <= variant.end,
+            )
+          ) {
+            continue
+          }
+          addSpan(highlights, sourceStart, range.start, range.end, 'modifier')
+        }
+      }
+
+      if (isGroupEnabled(options, 'utility')) {
+        addSpan(highlights, sourceStart, parts.utilityStart, candidate.length, 'utility')
+      }
       continue
     }
 
-    const important = findImportantModifierRanges(candidate, parts.utilityStart).length > 0
-
-    if (!important) {
-      for (const variant of parts.variantRanges) {
-        const variantName = candidate.slice(variant.start, variant.end - 1)
-        addSpan(
-          highlights,
-          sourceStart,
-          variant.start,
-          variant.end,
-          validator.isBreakpointVariant(variantName) ? 'breakpoint' : 'variant',
-        )
+    if (!syntax.important) {
+      if (prefixRange && isGroupEnabled(options, 'prefix')) {
+        addSpan(highlights, sourceStart, prefixRange.start, prefixRange.end, 'prefix')
       }
 
-      for (const range of findArbitraryBracketRanges(candidate)) {
-        addSpan(highlights, sourceStart, range.start, range.end, 'arbitrary')
+      for (const variant of prefixRange ? parts.variantRanges.slice(1) : parts.variantRanges) {
+        const variantName = candidate.slice(variant.start, variant.end - 1)
+        const group = validator.isBreakpointVariant(variantName) ? 'breakpoint' : 'variant'
+        if (isGroupEnabled(options, group)) {
+          addSpan(highlights, sourceStart, variant.start, variant.end, group)
+        }
+      }
+
+      if (arbitraryEnabled) {
+        for (const range of syntax.arbitraryRanges) {
+          addSpan(highlights, sourceStart, range.start, range.end, 'arbitrary')
+        }
+      }
+
+      if (modifierEnabled) {
+        for (const range of syntax.modifierRanges) {
+          addSpan(highlights, sourceStart, range.start, range.end, 'modifier')
+        }
       }
     }
 
-    addSpan(highlights, sourceStart, parts.utilityStart, candidate.length, 'utility')
+    if (isGroupEnabled(options, 'utility')) {
+      addSpan(highlights, sourceStart, parts.utilityStart, candidate.length, 'utility')
+    }
 
-    if (important) {
+    if (syntax.important) {
       addSpan(highlights, sourceStart, 0, candidate.length, 'important')
     }
   }
