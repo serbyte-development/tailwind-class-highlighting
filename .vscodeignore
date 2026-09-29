@@ -17,4 +17,5 @@ esbuild.mjs
 tsconfig.json
 biome.json
 .nvmrc
+.oss-release.yaml
 package-lock.json

@@ -1,6 +1,7 @@
 ---
 summary: 'Validation, esbuild bundling, native VSIX packaging, CI workflows, target matrix, and mandatory registry-publishing safety rules.'
 paths:
+  - .oss-release.yaml
   - esbuild.mjs
   - scripts/package.mjs
   - biome.json
@@ -27,6 +28,8 @@ paths:
 ## Packaging and CI
 
 `npm run package` selects current host OS/architecture and calls `vsce package --target`, writing a target-specific VSIX. Supported matrix is macOS, Linux, Windows × x64/arm64. Unsupported host pairs fail.
+
+`.oss-release.yaml` routes tagged `package.yml` artifacts to GitHub Release, Visual Studio Marketplace, and Open VSX. The release orchestrator uses the six platform-specific VSIX artifacts rather than rebuilding registry packages independently.
 
 CI uses Node 24. Linux runs the complete `verify` gate and host packaging, while lightweight macOS and Windows jobs run path-sensitive tests. The Package workflow follows the same pattern: full validation once on Linux, tests on representative macOS/Windows hosts, then six OS/architecture jobs that only install and package their native target. This preserves cross-platform coverage without repeating lint/typecheck/full validation six times. Workflows use the current Node-24-generation official GitHub actions and do not publish to registries.
 
