@@ -63,6 +63,19 @@ describe('candidate emphasis ranges', () => {
     ])
   })
 
+  it('keeps escaped arbitrary brackets from changing variant boundaries or bracket styling', () => {
+    const candidate = String.raw`hover:bg-[foo\]bar:baz]`
+
+    expect(splitCandidate(candidate)).toEqual({
+      variantRanges: [{ start: 0, end: 6 }],
+      utilityStart: 6,
+    })
+    expect(findArbitraryBracketRanges(candidate)).toEqual([
+      { start: 9, end: 10 },
+      { start: candidate.length - 1, end: candidate.length },
+    ])
+  })
+
   it('finds Tailwind v4 CSS-variable shorthand ranges', () => {
     const first = 'hover:bg-(--brand-color)'
     const second = 'text-(color:--body-text)'

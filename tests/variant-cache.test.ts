@@ -7,6 +7,18 @@ import { TailwindProjectManager } from '../src/tailwind/project'
 
 const temporaryDirectories: string[] = []
 
+interface VariantCacheInstrumentation {
+  loads: Array<Map<string, number>>
+}
+
+function isVariantCacheInstrumentation(value: unknown): value is VariantCacheInstrumentation {
+  if (typeof value !== 'object' || value === null || !('loads' in value)) {
+    return false
+  }
+  const loads = value.loads
+  return Array.isArray(loads) && loads.every((calls) => calls instanceof Map)
+}
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
@@ -53,13 +65,16 @@ exports.__unstable__loadDesignSystem = async (css) => {
   )
   const stylesheet = path.join(root, 'src/app.css')
   await writeFile(stylesheet, '@import "tailwindcss";')
-  const instrumentation = createRequire(path.join(root, 'package.json'))(modulePath) as {
-    loads: Array<Map<string, number>>
+  const instrumentation: unknown = createRequire(path.join(root, 'package.json'))(modulePath)
+  if (!isVariantCacheInstrumentation(instrumentation)) {
+    throw new Error('Instrumented Tailwind module did not expose call counts')
   }
   const manager = new TailwindProjectManager()
   const document = path.join(root, 'src/component.tsx')
   const project = await manager.getProject(document, root)
-  if (!project) throw new Error('Instrumented Tailwind project did not load')
+  if (!project) {
+    throw new Error('Instrumented Tailwind project did not load')
+  }
   return { root, manager, document, stylesheet, project, instrumentation }
 }
 

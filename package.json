@@ -2,7 +2,7 @@
   "name": "tailwind-class-highlighting",
   "displayName": "Tailwind Class Highlighting",
   "description": "Fast, subtle Tailwind CSS v4 class highlighting for VS Code and Cursor.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "serbytedevelopment",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -39,14 +39,26 @@
   "extensionKind": [
     "workspace"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Tailwind project loading can execute workspace-defined @plugin and @config modules."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Highlighting requires native Oxide and direct filesystem access to the workspace Tailwind installation."
+    }
+  },
   "scripts": {
     "build": "node esbuild.mjs",
     "build:production": "node esbuild.mjs --production",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "bench": "vitest bench --run",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write --unsafe .",
+    "format": "biome format --write .",
+    "verify": "npm run lint && npm run check && npm test",
     "vscode:prepublish": "npm run build:production",
     "package": "node scripts/package.mjs"
   },
@@ -126,10 +138,10 @@
         "id": "tailwindClassHighlighting.environmentVariant",
         "description": "Foreground color for opt-in environment and media variants.",
         "defaults": {
-          "dark": "#44D0CF",
-          "light": "#3090A3",
-          "highContrast": "#63D7DB",
-          "highContrastLight": "#2B8296"
+          "dark": "#1986D1",
+          "light": "#0446A5",
+          "highContrast": "#388CDD",
+          "highContrastLight": "#003898"
         }
       },
       {
@@ -256,6 +268,7 @@
             "class",
             "className",
             "ngClass",
+            "[ngClass]",
             "class:list",
             ":class",
             "v-bind:class"
@@ -279,7 +292,7 @@
         },
         "tailwindClassHighlighting.debounceMs": {
           "type": "number",
-          "default": 25,
+          "default": 100,
           "minimum": 0,
           "maximum": 250,
           "description": "Delay before rescanning after an edit."
@@ -319,27 +332,27 @@
         "tailwindClassHighlighting.styles.arbitraryVariant.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Use a derived Variant color for arbitrary variants such as [&>svg]:. Falls back to Variant when disabled."
+          "description": "Enable specialized highlighting for arbitrary variants such as [&>svg]:. Falls back to Variant when disabled."
         },
         "tailwindClassHighlighting.styles.relationshipVariant.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Use a derived Variant color for group, peer, has, and in variants. Falls back to Variant when disabled."
+          "description": "Enable specialized highlighting for group, peer, has, and in variants. Falls back to Variant when disabled."
         },
         "tailwindClassHighlighting.styles.attributeVariant.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Use a derived Variant color for data and aria variants. Falls back to Variant when disabled."
+          "description": "Enable specialized highlighting for data and aria variants. Falls back to Variant when disabled."
         },
         "tailwindClassHighlighting.styles.pseudoElementVariant.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Use a derived Variant color for pseudo-element variants such as before: and placeholder:. Falls back to Variant when disabled."
+          "description": "Enable specialized highlighting for pseudo-element variants such as before: and placeholder:. Falls back to Variant when disabled."
         },
         "tailwindClassHighlighting.styles.environmentVariant.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Use a derived Variant color for environment/media variants such as dark:, motion-reduce:, print:, and supports-*. Falls back to Variant when disabled."
+          "description": "Enable specialized highlighting for environment/media variants such as dark:, motion-reduce:, print:, and supports-*. Falls back to Variant when disabled."
         },
         "tailwindClassHighlighting.styles.unresolvedVariant.enabled": {
           "type": "boolean",
@@ -388,14 +401,13 @@
     "@tailwindcss/oxide": "4.3.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.14",
     "@types/node": "^20.19.43",
-    "@types/react": "^19.2.18",
     "@types/vscode": "1.95.0",
-    "@vscode/vsce": "^3.9.2",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
-    "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3",
-    "vitest": "4.1.10"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

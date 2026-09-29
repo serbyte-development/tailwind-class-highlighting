@@ -19,8 +19,16 @@ export function splitCandidate(candidate: string): CandidateParts {
     const char = candidate[i]
 
     if (quote) {
-      if (char === '\\') i++
-      else if (char === quote) quote = null
+      if (char === '\\') {
+        i++
+      } else if (char === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (char === '\\') {
+      i++
       continue
     }
 
@@ -29,11 +37,15 @@ export function splitCandidate(candidate: string): CandidateParts {
       continue
     }
 
-    if (char === '[') squareDepth++
-    else if (char === ']') squareDepth = Math.max(0, squareDepth - 1)
-    else if (char === '(') parenDepth++
-    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1)
-    else if (char === ':' && squareDepth === 0 && parenDepth === 0) {
+    if (char === '[') {
+      squareDepth++
+    } else if (char === ']') {
+      squareDepth = Math.max(0, squareDepth - 1)
+    } else if (char === '(') {
+      parenDepth++
+    } else if (char === ')') {
+      parenDepth = Math.max(0, parenDepth - 1)
+    } else if (char === ':' && squareDepth === 0 && parenDepth === 0) {
       variantRanges.push({ start: segmentStart, end: i + 1 })
       segmentStart = i + 1
     }
@@ -50,8 +62,16 @@ export function findArbitraryBracketRanges(candidate: string): CandidateRange[] 
     const char = candidate[i]
 
     if (quote) {
-      if (char === '\\') i++
-      else if (char === quote) quote = null
+      if (char === '\\') {
+        i++
+      } else if (char === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (char === '\\') {
+      i++
       continue
     }
 
@@ -60,7 +80,9 @@ export function findArbitraryBracketRanges(candidate: string): CandidateRange[] 
       continue
     }
 
-    if (char === '[' || char === ']') ranges.push({ start: i, end: i + 1 })
+    if (char === '[' || char === ']') {
+      ranges.push({ start: i, end: i + 1 })
+    }
   }
 
   return ranges
@@ -106,8 +128,11 @@ export function findModifierRanges(
       const char = candidate[i]
 
       if (quote) {
-        if (char === '\\') i++
-        else if (char === quote) quote = null
+        if (char === '\\') {
+          i++
+        } else if (char === quote) {
+          quote = null
+        }
         continue
       }
 
@@ -121,11 +146,15 @@ export function findModifierRanges(
         continue
       }
 
-      if (char === '[') squareDepth++
-      else if (char === ']') squareDepth = Math.max(0, squareDepth - 1)
-      else if (char === '(') parenDepth++
-      else if (char === ')') parenDepth = Math.max(0, parenDepth - 1)
-      else if (char === '/' && squareDepth === 0 && parenDepth === 0) {
+      if (char === '[') {
+        squareDepth++
+      } else if (char === ']') {
+        squareDepth = Math.max(0, squareDepth - 1)
+      } else if (char === '(') {
+        parenDepth++
+      } else if (char === ')') {
+        parenDepth = Math.max(0, parenDepth - 1)
+      } else if (char === '/' && squareDepth === 0 && parenDepth === 0) {
         ranges.push({ start: i, end: segment.end })
         break
       }
@@ -147,8 +176,11 @@ export function findArbitraryValueRanges(
   for (let i = utilityStart; i < candidate.length; i++) {
     const char = candidate[i]
     if (quote) {
-      if (char === '\\') i++
-      else if (char === quote) quote = null
+      if (char === '\\') {
+        i++
+      } else if (char === quote) {
+        quote = null
+      }
       continue
     }
     if (char === '\\') {
@@ -160,7 +192,9 @@ export function findArbitraryValueRanges(
       continue
     }
     if (char === '[') {
-      if (depth === 0) start = i
+      if (depth === 0) {
+        start = i
+      }
       depth++
     } else if (char === ']' && depth > 0) {
       depth--
@@ -178,15 +212,20 @@ export function findCssVariableRanges(candidate: string, utilityStart: number): 
   const ranges: CandidateRange[] = []
 
   for (let i = utilityStart + 1; i < candidate.length; i++) {
-    if (candidate[i - 1] !== '-' || candidate[i] !== '(') continue
+    if (candidate[i - 1] !== '-' || candidate[i] !== '(') {
+      continue
+    }
 
     let depth = 1
     let quote: string | null = null
     for (let j = i + 1; j < candidate.length; j++) {
       const char = candidate[j]
       if (quote) {
-        if (char === '\\') j++
-        else if (char === quote) quote = null
+        if (char === '\\') {
+          j++
+        } else if (char === quote) {
+          quote = null
+        }
         continue
       }
       if (char === '\\') {
@@ -197,8 +236,9 @@ export function findCssVariableRanges(candidate: string, utilityStart: number): 
         quote = char
         continue
       }
-      if (char === '(') depth++
-      else if (char === ')' && --depth === 0) {
+      if (char === '(') {
+        depth++
+      } else if (char === ')' && --depth === 0) {
         const content = candidate.slice(i + 1, j)
         if (content.startsWith('--') || content.includes(':--')) {
           ranges.push({ start: i, end: j + 1 })

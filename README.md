@@ -3,11 +3,11 @@
 [![CI](https://github.com/Serbyte-Development/tailwind-class-highlighting/actions/workflows/ci.yml/badge.svg)](https://github.com/Serbyte-Development/tailwind-class-highlighting/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<!--
+
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/serbytedevelopment.tailwind-class-highlighting)](https://marketplace.visualstudio.com/items?itemName=serbytedevelopment.tailwind-class-highlighting)
 [![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/serbytedevelopment.tailwind-class-highlighting)](https://marketplace.visualstudio.com/items?itemName=serbytedevelopment.tailwind-class-highlighting)
 [![Open VSX Version](https://img.shields.io/open-vsx/v/serbytedevelopment/tailwind-class-highlighting)](https://open-vsx.org/extension/serbytedevelopment/tailwind-class-highlighting)
--->
+
 
 Make dense Tailwind CSS v4 class lists easier to read in VS Code, Cursor, and compatible editors.
 
@@ -28,6 +28,13 @@ Make dense Tailwind CSS v4 class lists easier to read in VS Code, Cursor, and co
 - **Keep normal utilities calm.** Recognized utilities keep the editor's normal text color and receive only a faint dotted underline.
 - **Leave ordinary custom classes alone by default.** Optional non-Tailwind highlighting can color literal class text rejected by Tailwind.
 - **Follow your actual Tailwind project.** Tailwind v4 utilities, theme values, custom variants, custom breakpoints, and `@utility` definitions are validated by the project's own Tailwind installation.
+- **Customize the whole visual system.** Every highlight category can be enabled or disabled and given its own color and opacity, so you can keep the defaults restrained or turn on the full set of visual distinctions.
+
+### Customize every highlight category
+
+Use **Tailwind Class Highlighting: Configure Styles** to control what stands out and how it looks. Every category has its own enable toggle, color, opacity, reset action, and live preview. Changes stay local to the configurator until you press **Apply Changes**.
+
+![Tailwind Class Highlighting visual configuration panel with per-category colors, opacity, toggles, and previews](images/configuration.png)
 
 **Requires Tailwind CSS v4.** Tailwind CSS v3 and earlier are intentionally unsupported.
 
@@ -69,7 +76,7 @@ All visual colors are native VS Code theme colors and can be overridden with `wo
     "tailwindClassHighlighting.relationshipVariant": "#28E5CA",
     "tailwindClassHighlighting.attributeVariant": "#8AC77A",
     "tailwindClassHighlighting.pseudoElementVariant": "#87B9B1",
-    "tailwindClassHighlighting.environmentVariant": "#44D0CF",
+    "tailwindClassHighlighting.environmentVariant": "#1986D1",
     "tailwindClassHighlighting.unresolvedVariant": "#E5C07B",
     "tailwindClassHighlighting.prefix": "#7AA2F7",
     "tailwindClassHighlighting.modifier": "#F0A868",
@@ -82,9 +89,9 @@ All visual colors are native VS Code theme colors and can be overridden with `wo
 }
 ```
 
-Use **Tailwind Class Highlighting: Configure Styles** from the Command Palette for a live visual editor. Utility and independent categories have color controls; specialized variant-family colors are derived automatically from the single Variant base color. Utility also exposes underline style and optional text coloring. The panel writes the same settings shown below, so manual `settings.json` editing remains fully supported.
+Use **Tailwind Class Highlighting: Configure Styles** from the Command Palette for a live visual editor. Every category, including specialized variant families, has the same color and opacity controls. Specialized variant defaults are derived from the Variant palette, but each family can be customized independently. Utility also exposes underline style and optional text coloring. Edits preview immediately inside the panel but do not touch `settings.json` until **Apply Changes**. The panel writes the same settings shown below, so manual `settings.json` editing remains fully supported.
 
-On editor runtimes with alpha-capable native color pickers, opacity is selected inside the color picker. Older runtimes get a compact percentage fallback. Opacity is stored in the color alpha channel; for example, `#E5C07B80` is roughly 50% opacity.
+Color and opacity are separate controls in Configure Styles: a native color picker plus an opacity slider with a percentage readout. Opacity is stored in the color alpha channel; for example, `#E5C07B80` is roughly 50% opacity. Reset removes the extension's user color overrides for that category and restores the active theme default.
 
 The extension is intentionally focused on readability. It does not provide completion, linting, formatting, or class sorting, and is designed to work alongside the official Tailwind CSS IntelliSense extension.
 
@@ -92,7 +99,7 @@ The extension is intentionally focused on readability. It does not provide compl
 
 - `class` and `className`
 - Vue `:class` / `v-bind:class`
-- Angular `ngClass`
+- Angular `ngClass` / `[ngClass]`
 - Astro `class:list`
 - `clsx`, `classnames`, `cn`, `cva`, `twMerge`
 - configurable class functions and tagged templates
@@ -111,6 +118,8 @@ Tailwind CSS v3 and earlier are intentionally unsupported. If no local Tailwind 
 
 The bundled Oxide scanner remains intentional: installing `tailwindcss` alone does not guarantee that `@tailwindcss/oxide` exists in the project.
 
+Tailwind project loading can execute workspace-defined `@plugin` / `@config` modules, so the extension requires a trusted workspace. It supports normal local and remote filesystem workspaces, but not virtual/web workspaces.
+
 ## Platforms
 
 Oxide is a native dependency, so releases are packaged separately for:
@@ -127,21 +136,21 @@ All settings are under `tailwindClassHighlighting`:
 - `languages` - VS Code language IDs to scan.
 - `classAttributes` - additional class-bearing attributes.
 - `classFunctions` - regular-expression patterns for class helper functions or tagged templates.
-- `debounceMs` - edit debounce from 0 to 250 ms.
+- `debounceMs` - edit debounce from 0 to 250 ms; defaults to 100 ms.
 - `styles.utility.enabled` - enable utility highlighting.
 - `styles.utility.underlineStyle` - `dotted`, `solid`, `dashed`, `double`, or `none`.
 - `styles.utility.colorEnabled` - optionally apply the utility foreground color; disabled by default.
 - `styles.breakpoint.enabled`, `styles.variant.enabled`, `styles.unresolvedVariant.enabled`, `styles.prefix.enabled`, `styles.modifier.enabled`, `styles.arbitrary.enabled`, and `styles.important.enabled` - toggle each Tailwind visual category independently.
-- `styles.arbitraryVariant.enabled`, `styles.relationshipVariant.enabled`, `styles.attributeVariant.enabled`, `styles.pseudoElementVariant.enabled`, and `styles.environmentVariant.enabled` - opt into specialized variant families. Each falls back to `variant` when disabled, and Configure Styles derives their palette from the Variant base color.
+- `styles.arbitraryVariant.enabled`, `styles.relationshipVariant.enabled`, `styles.attributeVariant.enabled`, `styles.pseudoElementVariant.enabled`, and `styles.environmentVariant.enabled` - opt into specialized variant families. Each falls back to `variant` when disabled; when enabled, its color can be customized independently.
 - `styles.arbitraryValue.enabled` - color the complete arbitrary value such as `[317px]`; disabled by default.
 - `styles.cssVariable.enabled` - color Tailwind v4 CSS-variable shorthand such as `(--brand-color)`; disabled by default.
 - `styles.nonTailwind.enabled` - opt into highlighting literal class text rejected by Tailwind; disabled by default.
 
-Run **Tailwind Class Highlighting: Configure Styles** from the Command Palette to open the live configurator. Changes are saved to User Settings. Colors remain native theme colors under `workbench.colorCustomizations`, and behavior remains under `tailwindClassHighlighting.styles.*`.
+Run **Tailwind Class Highlighting: Configure Styles** from the Command Palette to open the live configurator. Changes are staged locally until **Apply Changes**, then persisted to User Settings. Colors remain native theme colors under `workbench.colorCustomizations`, and behavior remains under `tailwindClassHighlighting.styles.*`.
 
 ## Performance
 
-The extension scans only class-bearing source regions, performs one Oxide scan per update, caches project/design-system resolution, caches candidate validity inside each loaded design system, batches ranges by visual treatment, and skips decoration calls whose ranges did not change. Unresolved-variant detection adds one deduplicated validation batch only when an invalid candidate contains variants. Literal-range tracking for non-Tailwind classes runs only when that opt-in style is enabled. Oxide and project-local Tailwind loading happen only when a supported editor actually needs highlighting.
+The extension scans only class-bearing source regions, filters extracted candidates back to literal class text or class-object keys so normal expression identifiers are not colored, performs one Oxide scan per update, caches project/design-system resolution, caches candidate and specialized-variant classification inside each loaded design system, batches ranges by visual treatment, and skips decoration calls whose ranges did not change. CSS changes evict affected Tailwind projects, including projects that loaded the changed stylesheet from outside their package root; package manifests and lockfiles trigger a full dependency-resolution reset. Unresolved-variant detection adds one deduplicated validation batch only when an invalid candidate contains variants. Oxide and project-local Tailwind loading happen only when a supported editor actually needs highlighting.
 
 The synthetic dense-file benchmark can be run with:
 
@@ -151,11 +160,13 @@ npm run bench
 
 ## Development
 
+Use Node.js 24 for repository tooling (`.nvmrc` is included). The extension bundle itself remains targeted at the Node 20-era VS Code extension host required by VS Code `^1.95.0`.
+
 ```sh
 npm install
-npm test
-npm run check
-npm run format:check
+npm run verify
+npm run lint:fix
+npm run format
 npm run build
 npm run bench
 npm run package

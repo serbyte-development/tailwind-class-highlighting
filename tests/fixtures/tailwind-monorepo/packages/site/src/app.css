@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../../../shared.css';
 
 @utility site-only {
   display: block;

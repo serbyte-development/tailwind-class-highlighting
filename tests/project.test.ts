@@ -5,7 +5,7 @@ import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { analyzeText } from '../src/core/analyze'
 import { getCandidateScanner } from '../src/core/scanner'
-import { TailwindProjectManager } from '../src/tailwind/project'
+import { type TailwindProject, TailwindProjectManager } from '../src/tailwind/project'
 
 const fixtureRoot = path.resolve('tests/fixtures/tailwind-v4')
 const monorepoRoot = path.resolve('tests/fixtures/tailwind-monorepo')
@@ -13,6 +13,14 @@ const brokenFixtureRoot = path.resolve('tests/fixtures/tailwind-v4-broken')
 const ambiguousFixtureRoot = path.resolve('tests/fixtures/tailwind-v4-ambiguous')
 const prefixFixtureRoot = path.resolve('tests/fixtures/tailwind-v4-prefix')
 const temporaryDirectories: string[] = []
+const tailwindV4VersionPattern = /^4\./
+
+function requireProject(project: TailwindProject | null): TailwindProject {
+  if (!project) {
+    throw new Error('Expected Tailwind project to load')
+  }
+  return project
+}
 
 afterEach(async () => {
   await Promise.all(
@@ -23,10 +31,12 @@ afterEach(async () => {
 describe('TailwindProjectManager', () => {
   it('loads the nearest Tailwind v4 project and validates project-defined classes', async () => {
     const manager = new TailwindProjectManager()
-    const project = await manager.getProject(path.join(fixtureRoot, 'src/component.js'))
+    const project = requireProject(
+      await manager.getProject(path.join(fixtureRoot, 'src/component.js')),
+    )
 
     expect(project?.root).toBe(fixtureRoot)
-    expect(project?.version).toMatch(/^4\./)
+    expect(project?.version).toMatch(tailwindV4VersionPattern)
     expect(project?.entrypoint).toBe(path.join(fixtureRoot, 'src/app.css'))
 
     const valid = project?.validator?.getValidCandidates([
@@ -38,6 +48,7 @@ describe('TailwindProjectManager', () => {
       'tablet:project-card',
       '@card:project-card',
       'w-[317px]',
+      'extensionless-pcss',
       'ignored-legacy-anchor',
       'not-a-real-tailwind-class',
     ])
@@ -52,13 +63,16 @@ describe('TailwindProjectManager', () => {
         'tablet:project-card',
         '@card:project-card',
         'w-[317px]',
+        'extensionless-pcss',
       ]),
     )
   })
 
   it('uses @import tailwindcss as the v4 anchor instead of Tailwind-looking CSS heuristics', async () => {
     const manager = new TailwindProjectManager()
-    const project = await manager.getProject(path.join(fixtureRoot, 'src/component.js'))
+    const project = requireProject(
+      await manager.getProject(path.join(fixtureRoot, 'src/component.js')),
+    )
 
     expect(project?.entrypoint).toBe(path.join(fixtureRoot, 'src/app.css'))
     expect(
@@ -68,14 +82,16 @@ describe('TailwindProjectManager', () => {
 
   it('feeds project-defined Tailwind classes through the normal highlighting pipeline', async () => {
     const manager = new TailwindProjectManager()
-    const project = await manager.getProject(path.join(fixtureRoot, 'src/component.js'))
+    const project = requireProject(
+      await manager.getProject(path.join(fixtureRoot, 'src/component.js')),
+    )
     const scanner = await getCandidateScanner()
     const text = `<div className="project-card hocus:bg-brand tablet:project-card @card:project-card plain-custom" />`
     const spans = analyzeText(
       text,
       { classAttributes: ['className'], classFunctions: [] },
       scanner,
-      project!.validator,
+      project.validator,
     )
     const highlighted = spans.map((span) => ({
       value: text.slice(span.start, span.end),
@@ -92,16 +108,32 @@ describe('TailwindProjectManager', () => {
 
   it('classifies opt-in variant families through the Tailwind design system', async () => {
     const manager = new TailwindProjectManager()
-    const project = await manager.getProject(path.join(fixtureRoot, 'src/component.js'))
-    const validator = project!.validator
+    const project = requireProject(
+      await manager.getProject(path.join(fixtureRoot, 'src/component.js')),
+    )
+    const validator = project.validator
 
     expect(validator.classifyVariant('[&>svg]')).toBe('arbitraryVariant')
     expect(validator.classifyVariant('group-hover')).toBe('relationshipVariant')
+    expect(validator.classifyVariant('*')).toBe('relationshipVariant')
+    expect(validator.classifyVariant('**')).toBe('relationshipVariant')
     expect(validator.classifyVariant('data-[state=open]')).toBe('attributeVariant')
+    expect(validator.classifyVariant('open')).toBe('attributeVariant')
+    expect(validator.classifyVariant('rtl')).toBe('attributeVariant')
+    expect(validator.classifyVariant('ltr')).toBe('attributeVariant')
+    expect(validator.classifyVariant('inert')).toBe('attributeVariant')
     expect(validator.classifyVariant('before')).toBe('pseudoElementVariant')
+    expect(validator.classifyVariant('details-content')).toBe('pseudoElementVariant')
     expect(validator.classifyVariant('dark')).toBe('environmentVariant')
     expect(validator.classifyVariant('supports-[display:grid]')).toBe('environmentVariant')
     expect(validator.classifyVariant('hover')).toBeNull()
+
+    expect(validator.isBreakpointVariant('@[20rem]')).toBe(true)
+    expect(validator.isBreakpointVariant('@min-[20rem]')).toBe(true)
+    expect(validator.isBreakpointVariant('@max-[20rem]/card')).toBe(true)
+    expect(validator.isBreakpointVariant('@[calc(40rem/2)]')).toBe(true)
+    expect(validator.isBreakpointVariant('@min-[calc(40rem/2)]')).toBe(true)
+    expect(validator.isBreakpointVariant('@max-[calc(40rem/2)]/card')).toBe(true)
   })
 
   it('refreshes real Tailwind classifications and validity after custom-variant CSS edits', async () => {
@@ -119,7 +151,7 @@ describe('TailwindProjectManager', () => {
     const document = path.join(root, 'component.tsx')
     await writeFile(stylesheet, '@import "tailwindcss";')
     const manager = new TailwindProjectManager()
-    const original = (await manager.getProject(document, root))!.validator
+    const original = requireProject(await manager.getProject(document, root)).validator
     expect(original.classifyVariant('group-hover')).toBe('relationshipVariant')
     expect(original.classifyVariant('active-true')).toBeNull()
     expect(original.getValidCandidates(['active-true:flex'])).toEqual(new Set())
@@ -129,14 +161,14 @@ describe('TailwindProjectManager', () => {
       '@import "tailwindcss";\n@custom-variant group-hover (&:focus);\n@custom-variant active-true (&:active);',
     )
     manager.invalidateAll()
-    const updated = (await manager.getProject(document, root))!.validator
+    const updated = requireProject(await manager.getProject(document, root)).validator
     expect(updated).not.toBe(original)
     expect(updated.classifyVariant('group-hover')).toBeNull()
     expect(updated.getValidCandidates(['active-true:flex'])).toEqual(new Set(['active-true:flex']))
 
     await writeFile(stylesheet, '@import "tailwindcss";')
     manager.invalidateAll()
-    const restored = (await manager.getProject(document, root))!.validator
+    const restored = requireProject(await manager.getProject(document, root)).validator
     expect(restored).not.toBe(updated)
     expect(restored.classifyVariant('group-hover')).toBe('relationshipVariant')
     expect(restored.getValidCandidates(['active-true:flex'])).toEqual(new Set())
@@ -144,7 +176,9 @@ describe('TailwindProjectManager', () => {
 
   it('uses the project prefix as syntax instead of treating it as a variant', async () => {
     const manager = new TailwindProjectManager()
-    const project = await manager.getProject(path.join(prefixFixtureRoot, 'src/component.js'))
+    const project = requireProject(
+      await manager.getProject(path.join(prefixFixtureRoot, 'src/component.js')),
+    )
     const scanner = await getCandidateScanner()
 
     expect(project?.validator.getPrefix()).toBe('tw')
@@ -157,7 +191,7 @@ describe('TailwindProjectManager', () => {
       text,
       { classAttributes: ['className'], classFunctions: [] },
       scanner,
-      project!.validator,
+      project.validator,
     ).map((span) => ({
       value: text.slice(span.start, span.end),
       group: span.group,
@@ -211,6 +245,139 @@ describe('TailwindProjectManager', () => {
     )
     expect(adminProject?.validator?.getValidCandidates(['site-only', 'admin-only'])).toEqual(
       new Set(['admin-only']),
+    )
+  })
+
+  it('invalidates only the Tailwind package containing a changed stylesheet', async () => {
+    const manager = new TailwindProjectManager()
+    const siteRoot = path.join(monorepoRoot, 'packages/site')
+    const adminRoot = path.join(monorepoRoot, 'packages/admin')
+    const siteDocument = path.join(siteRoot, 'src/component.js')
+    const adminDocument = path.join(adminRoot, 'src/component.js')
+    const siteProject = requireProject(await manager.getProject(siteDocument, monorepoRoot))
+    const adminProject = requireProject(await manager.getProject(adminDocument, monorepoRoot))
+
+    manager.invalidatePath(path.join(siteRoot, 'src/app.css'))
+
+    const refreshedSite = requireProject(await manager.getProject(siteDocument, monorepoRoot))
+    const preservedAdmin = requireProject(await manager.getProject(adminDocument, monorepoRoot))
+
+    expect(refreshedSite.validator).not.toBe(siteProject.validator)
+    expect(preservedAdmin.validator).toBe(adminProject.validator)
+  })
+
+  it('invalidates a project when a loaded stylesheet outside its package changes', async () => {
+    const manager = new TailwindProjectManager()
+    const siteRoot = path.join(monorepoRoot, 'packages/site')
+    const adminRoot = path.join(monorepoRoot, 'packages/admin')
+    const siteDocument = path.join(siteRoot, 'src/component.js')
+    const adminDocument = path.join(adminRoot, 'src/component.js')
+    const siteProject = requireProject(await manager.getProject(siteDocument, monorepoRoot))
+    const adminProject = requireProject(await manager.getProject(adminDocument, monorepoRoot))
+
+    expect(siteProject.validator.getValidCandidates(['shared-site-only'])).toEqual(
+      new Set(['shared-site-only']),
+    )
+
+    manager.invalidatePath(path.join(monorepoRoot, 'shared.css'))
+
+    const refreshedSite = requireProject(await manager.getProject(siteDocument, monorepoRoot))
+    const preservedAdmin = requireProject(await manager.getProject(adminDocument, monorepoRoot))
+
+    expect(refreshedSite.validator).not.toBe(siteProject.validator)
+    expect(preservedAdmin.validator).toBe(adminProject.validator)
+  })
+
+  it('retries a failed project when a previously missing external stylesheet is created', async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'tailwind-external-stylesheet-'))
+    temporaryDirectories.push(workspaceRoot)
+    const siteRoot = path.join(workspaceRoot, 'site')
+    const sourceRoot = path.join(siteRoot, 'src')
+    const tailwindDirectory = path.join(siteRoot, 'node_modules/tailwindcss')
+    await mkdir(sourceRoot, { recursive: true })
+    await mkdir(path.dirname(tailwindDirectory), { recursive: true })
+
+    const require = createRequire(path.resolve('package.json'))
+    await symlink(
+      path.dirname(require.resolve('tailwindcss/package.json')),
+      tailwindDirectory,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    )
+    await writeFile(path.join(siteRoot, 'package.json'), '{"private":true}')
+    await writeFile(
+      path.join(sourceRoot, 'app.css'),
+      '@import "tailwindcss";\n@import "../../shared.css";',
+    )
+
+    const document = path.join(sourceRoot, 'component.tsx')
+    const sharedStylesheet = path.join(workspaceRoot, 'shared.css')
+    const manager = new TailwindProjectManager()
+
+    const warn = console.warn
+    console.warn = () => {}
+    try {
+      await expect(manager.getProject(document, workspaceRoot)).resolves.toBeNull()
+    } finally {
+      console.warn = warn
+    }
+
+    await writeFile(sharedStylesheet, '@utility external-shared { display: inline-flex; }')
+    manager.invalidatePath(sharedStylesheet)
+
+    const project = requireProject(await manager.getProject(document, workspaceRoot))
+    expect(project.validator.getValidCandidates(['external-shared'])).toEqual(
+      new Set(['external-shared']),
+    )
+  })
+
+  it('retries a failed cross-package project when a stylesheet appears under a known package', async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'tailwind-cross-package-'))
+    temporaryDirectories.push(workspaceRoot)
+    const packageARoot = path.join(workspaceRoot, 'a')
+    const packageBRoot = path.join(workspaceRoot, 'b')
+    const tailwindDirectory = path.join(workspaceRoot, 'node_modules/tailwindcss')
+    await mkdir(path.join(packageARoot, 'src'), { recursive: true })
+    await mkdir(path.join(packageBRoot, 'src'), { recursive: true })
+    await mkdir(path.dirname(tailwindDirectory), { recursive: true })
+
+    const require = createRequire(path.resolve('package.json'))
+    await symlink(
+      path.dirname(require.resolve('tailwindcss/package.json')),
+      tailwindDirectory,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    )
+    await writeFile(path.join(packageARoot, 'package.json'), '{"private":true}')
+    await writeFile(path.join(packageBRoot, 'package.json'), '{"private":true}')
+    await writeFile(path.join(packageARoot, 'src/app.css'), '@import "tailwindcss";')
+    await writeFile(
+      path.join(packageBRoot, 'src/app.css'),
+      '@import "tailwindcss";\n@import "../../a/src/shared.css";',
+    )
+
+    const manager = new TailwindProjectManager()
+    requireProject(
+      await manager.getProject(path.join(packageARoot, 'src/component.tsx'), workspaceRoot),
+    )
+
+    const warn = console.warn
+    console.warn = () => {}
+    try {
+      await expect(
+        manager.getProject(path.join(packageBRoot, 'src/component.tsx'), workspaceRoot),
+      ).resolves.toBeNull()
+    } finally {
+      console.warn = warn
+    }
+
+    const sharedStylesheet = path.join(packageARoot, 'src/shared.css')
+    await writeFile(sharedStylesheet, '@utility cross-package-shared { display: inline-grid; }')
+    manager.invalidatePath(sharedStylesheet)
+
+    const project = requireProject(
+      await manager.getProject(path.join(packageBRoot, 'src/component.tsx'), workspaceRoot),
+    )
+    expect(project.validator.getValidCandidates(['cross-package-shared'])).toEqual(
+      new Set(['cross-package-shared']),
     )
   })
 

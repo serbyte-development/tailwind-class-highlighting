@@ -2,19 +2,19 @@
   "version": 1,
   "pages": {
     "pages/build-release.md": {
-      "fingerprint": "sha256:958838a597e97cf5a2aeca164854a7607d4ccf3f3e8db6583d790fd9b5ac052c"
+      "fingerprint": "sha256:121e3cb6fefefed8246a43d158732ffa75f2649f452bab72b021cc948dc1006e"
     },
     "pages/extension-runtime.md": {
-      "fingerprint": "sha256:c799ed0a14c57217455170d75eaac5759d77e64edaeedffc68302763f6d76624"
+      "fingerprint": "sha256:3f50e4d3c05ed02db359fec841fce6743951bafd383eddef24ddf68d9e128299"
     },
     "pages/highlighting-pipeline.md": {
-      "fingerprint": "sha256:306ee63c85b72032a59efc6da5a52ea684ead44677a1b99d79686923a06e78e8"
+      "fingerprint": "sha256:ef3583ef4c9775c07ccbe63162e0c3a4a5527bc8367ac4e42d4d6c4ca7e420a8"
     },
     "pages/open-questions-risks.md": {
-      "fingerprint": "sha256:c742d35ee5c25a7cb3743c45933f22b593f551b8a9a18d210d28bff79f9189ab"
+      "fingerprint": "sha256:baae60fac11a4febf69b3c0e529646f6fbd60675dc1d0e377b9a7b5471f2af61"
     },
     "pages/tailwind-project-resolution.md": {
-      "fingerprint": "sha256:a4c9e53392fffb30cec05240c8ff96888503d96dd6372391d7cf37c0598b430a"
+      "fingerprint": "sha256:159308866701fcfb7ffc67062a04cd0e2ada315d5cc50a2602b1a9b452f52148"
     }
   }
 }

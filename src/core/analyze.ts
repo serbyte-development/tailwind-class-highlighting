@@ -9,10 +9,10 @@ import {
 import { findClassTextRegions, findSourceRegions, type RegionOptions } from './regions'
 import type { CandidateScanner } from './scanner'
 import {
-  specializedVariantGroups,
   type HighlightGroup,
   type HighlightSpan,
   type SourceRegion,
+  specializedVariantGroups,
 } from './types'
 import type { CandidateValidator } from './validator'
 
@@ -42,6 +42,8 @@ interface CandidateSyntax {
   important: boolean
 }
 
+const whitespacePattern = /\s/
+
 const defaultDisabledGroups = new Set<HighlightGroup>([
   'nonTailwind',
   'arbitraryValue',
@@ -59,19 +61,32 @@ function classifyVariantGroup(
   options: AnalyzeOptions,
   specializedVariantsEnabled: boolean,
 ): HighlightGroup {
-  if (validator.isBreakpointVariant(variantName)) return 'breakpoint'
-  if (!specializedVariantsEnabled) return 'variant'
+  if (validator.isBreakpointVariant(variantName)) {
+    return 'breakpoint'
+  }
+  if (!specializedVariantsEnabled) {
+    return 'variant'
+  }
   const specialized = validator.classifyVariant(variantName)
   return specialized && isGroupEnabled(options, specialized) ? specialized : 'variant'
 }
 
 function mergeRegions(regions: SourceRegion[]): SourceRegion[] {
-  if (regions.length < 2) return regions
+  if (regions.length < 2) {
+    return regions
+  }
 
-  const merged: SourceRegion[] = [{ ...regions[0]! }]
-  for (let i = 1; i < regions.length; i++) {
-    const region = regions[i]!
-    const previous = merged[merged.length - 1]!
+  const first = regions[0]
+  if (!first) {
+    return []
+  }
+  const merged: SourceRegion[] = [{ ...first }]
+  for (const region of regions.slice(1)) {
+    const previous = merged.at(-1)
+    if (!previous) {
+      merged.push({ ...region })
+      continue
+    }
 
     if (region.start <= previous.end) {
       previous.end = Math.max(previous.end, region.end)
@@ -110,12 +125,20 @@ function mapToSource(regions: BufferRegion[], start: number, end: number): numbe
 
   while (low <= high) {
     const mid = (low + high) >> 1
-    const region = regions[mid]!
+    const region = regions[mid]
+    if (!region) {
+      return null
+    }
 
-    if (start < region.bufferStart) high = mid - 1
-    else if (start >= region.bufferEnd) low = mid + 1
-    else if (end <= region.bufferEnd) return region.sourceStart + (start - region.bufferStart)
-    else return null
+    if (start < region.bufferStart) {
+      high = mid - 1
+    } else if (start >= region.bufferEnd) {
+      low = mid + 1
+    } else if (end <= region.bufferEnd) {
+      return region.sourceStart + (start - region.bufferStart)
+    } else {
+      return null
+    }
   }
 
   return null
@@ -127,14 +150,36 @@ function isContainedBy(regions: SourceRegion[], start: number, end: number): boo
 
   while (low <= high) {
     const mid = (low + high) >> 1
-    const region = regions[mid]!
+    const region = regions[mid]
+    if (!region) {
+      return false
+    }
 
-    if (start < region.start) high = mid - 1
-    else if (start >= region.end) low = mid + 1
-    else return end <= region.end
+    if (start < region.start) {
+      high = mid - 1
+    } else if (start >= region.end) {
+      low = mid + 1
+    } else {
+      return end <= region.end
+    }
   }
 
   return false
+}
+
+function isObjectKeyCandidate(text: string, start: number, end: number): boolean {
+  let before = start - 1
+  while (before >= 0 && whitespacePattern.test(text[before] ?? '')) {
+    before--
+  }
+
+  let after = end
+  while (after < text.length && whitespacePattern.test(text[after] ?? '')) {
+    after++
+  }
+
+  const previous = text[before]
+  return (previous === '{' || previous === ',') && text[after] === ':'
 }
 
 function getPrefixRange(
@@ -142,9 +187,13 @@ function getPrefixRange(
   parts: ReturnType<typeof splitCandidate>,
   prefix: string | null,
 ): SourceRegion | null {
-  if (!prefix) return null
+  if (!prefix) {
+    return null
+  }
   const first = parts.variantRanges[0]
-  if (!first) return null
+  if (!first) {
+    return null
+  }
   return candidate.slice(first.start, first.end - 1) === prefix ? first : null
 }
 
@@ -175,15 +224,35 @@ export function analyzeText(
 ): HighlightSpan[] {
   const discoveredRegions = findSourceRegions(text, options)
   const sourceRegions = mergeRegions(discoveredRegions)
-  if (sourceRegions.length === 0) return []
+  if (sourceRegions.length === 0) {
+    return []
+  }
   const nonTailwindEnabled = isGroupEnabled(options, 'nonTailwind')
-  const classTextRegions = nonTailwindEnabled ? findClassTextRegions(text, discoveredRegions) : []
+  const classTextRegions = mergeRegions(findClassTextRegions(text, discoveredRegions))
 
   const scanBuffer = buildScanBuffer(text, sourceRegions)
-  const candidates = scanner.getCandidatesWithPositions({
-    content: scanBuffer.content,
-    extension: 'html',
-  })
+  const candidates = scanner
+    .getCandidatesWithPositions({
+      content: scanBuffer.content,
+      extension: 'html',
+    })
+    .flatMap(({ candidate, position }) => {
+      const bufferStart = Number(position)
+      const sourceStart = mapToSource(
+        scanBuffer.regions,
+        bufferStart,
+        bufferStart + candidate.length,
+      )
+      if (sourceStart == null) {
+        return []
+      }
+      const sourceEnd = sourceStart + candidate.length
+      const literalClassText = isContainedBy(classTextRegions, sourceStart, sourceEnd)
+      if (!literalClassText && !isObjectKeyCandidate(text, sourceStart, sourceEnd)) {
+        return []
+      }
+      return [{ candidate, sourceStart, literalClassText }]
+    })
   const uniqueCandidates = [...new Set(candidates.map(({ candidate }) => candidate))]
   const validCandidates = validator.getValidCandidates(uniqueCandidates)
   const prefix = validator.getPrefix()
@@ -221,15 +290,27 @@ export function analyzeText(
   const probeCandidates = new Set<string>()
 
   for (const candidate of uniqueCandidates) {
-    if (validCandidates.has(candidate)) continue
+    if (validCandidates.has(candidate)) {
+      continue
+    }
 
-    const { parts, prefixRange } = candidateSyntax.get(candidate)!
-    if (prefix && !prefixRange) continue
+    const syntax = candidateSyntax.get(candidate)
+    if (!syntax) {
+      continue
+    }
+    const { parts, prefixRange } = syntax
+    if (prefix && !prefixRange) {
+      continue
+    }
     const variants = prefixRange ? parts.variantRanges.slice(1) : parts.variantRanges
-    if (variants.length === 0) continue
+    if (variants.length === 0) {
+      continue
+    }
 
     const utility = candidate.slice(parts.utilityStart)
-    if (!utility) continue
+    if (!utility) {
+      continue
+    }
 
     probeCandidates.add(prefix ? `${prefix}:${utility}` : utility)
     for (const variant of variants) {
@@ -246,18 +327,30 @@ export function analyzeText(
   const unresolvedCandidates = new Map<string, ClassifiedVariant[]>()
 
   for (const candidate of uniqueCandidates) {
-    if (validCandidates.has(candidate)) continue
+    if (validCandidates.has(candidate)) {
+      continue
+    }
 
-    const { parts, prefixRange } = candidateSyntax.get(candidate)!
-    if (prefix && !prefixRange) continue
+    const syntax = candidateSyntax.get(candidate)
+    if (!syntax) {
+      continue
+    }
+    const { parts, prefixRange } = syntax
+    if (prefix && !prefixRange) {
+      continue
+    }
     const variantRanges = prefixRange ? parts.variantRanges.slice(1) : parts.variantRanges
     const utility = candidate.slice(parts.utilityStart)
     const utilityProbe = prefix ? `${prefix}:${utility}` : utility
-    if (!validProbeCandidates.has(utilityProbe)) continue
+    if (!validProbeCandidates.has(utilityProbe)) {
+      continue
+    }
 
     const variants = variantRanges.map((variant): ClassifiedVariant => {
       const probe = buildVariantProbe(prefix, candidate.slice(variant.start, variant.end), utility)
-      if (!validProbeCandidates.has(probe)) return { ...variant, group: 'unresolvedVariant' }
+      if (!validProbeCandidates.has(probe)) {
+        return { ...variant, group: 'unresolvedVariant' }
+      }
 
       const variantName = candidate.slice(variant.start, variant.end - 1)
       return {
@@ -272,21 +365,17 @@ export function analyzeText(
   }
   const highlights = new Map<string, HighlightSpan>()
 
-  for (const { candidate, position } of candidates) {
-    const bufferStart = Number(position)
-    const sourceStart = mapToSource(scanBuffer.regions, bufferStart, bufferStart + candidate.length)
-    if (sourceStart == null) continue
-
-    const syntax = candidateSyntax.get(candidate)!
+  for (const { candidate, sourceStart, literalClassText } of candidates) {
+    const syntax = candidateSyntax.get(candidate)
+    if (!syntax) {
+      continue
+    }
     const { parts, prefixRange } = syntax
 
     if (!validCandidates.has(candidate)) {
       const variants = unresolvedCandidates.get(candidate)
       if (!variants) {
-        if (
-          nonTailwindEnabled &&
-          isContainedBy(classTextRegions, sourceStart, sourceStart + candidate.length)
-        ) {
+        if (nonTailwindEnabled && literalClassText) {
           addSpan(highlights, sourceStart, 0, candidate.length, 'nonTailwind')
         }
         continue

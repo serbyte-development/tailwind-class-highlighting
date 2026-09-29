@@ -24,6 +24,16 @@ Per-category behavior lives in normal VS Code settings while colors remain VS Co
 
 The native-settings-only approach did not expose theme colors clearly or show what each Tailwind category affects. `Configure Styles` now opens an explicit webview with live examples, color pickers, opacity, enable/reset controls, and utility underline/text options. The panel remains a view/editor over existing User Settings and `workbench.colorCustomizations`; no second configuration store was introduced.
 
+Configurator edits are staged locally until the user presses **Apply Changes**. This keeps live preview responsive without rewriting `settings.json` for every slider/toggle interaction or repeatedly triggering editor save participants.
+
 ## 2026-09-27 — Specialized syntax stays opt-in and variant colors derive from one base
 
-Full arbitrary values, CSS-variable shorthand, and detailed arbitrary/relationship/attribute/pseudo-element/environment variant families are opt-in so existing highlighting does not become noisier. Disabled variant families deliberately emit the normal `variant` group. Configure Styles exposes one Variant base color and derives the optional family palette from it, preserving opacity, instead of adding five unrelated color decisions. The dedicated opacity slider was removed in favor of native color-picker alpha when supported, with a compact legacy fallback.
+Full arbitrary values, CSS-variable shorthand, and detailed arbitrary/relationship/attribute/pseudo-element/environment variant families are opt-in so existing highlighting does not become noisier. Disabled variant families deliberately emit the normal `variant` group. Configure Styles exposes one Variant base color and derives the optional family palette from it, preserving opacity, instead of adding five unrelated color decisions. Independent colors use a native color picker plus a separate opacity slider.
+
+## 2026-09-28 — Specialized variant colors became independently editable
+
+The derived-only configurator made specialized variant families behave differently from every other style and prevented targeted customization. Their shipped light/dark/high-contrast defaults still derive from the Variant palette, but Configure Styles now exposes the same color and opacity controls for each family. Changing Variant no longer rewrites specialized family colors; Reset restores each family's contributed derived default. The Environment / Media accent moved toward a deeper blue.
+
+## 2026-09-27 — Repository optimization kept one package and reduced shared knowledge
+
+The repository remains one extension package because introducing a workspace/packages hierarchy would add boundaries without an independently useful package. Prettier was replaced by one strict Biome gate, TypeScript moved to 7.x, development/CI moved to Node 24 while the extension bundle kept Node 20 compatibility, and CI validation was separated from the six native packaging jobs while retaining representative macOS/Windows tests. Runtime style metadata moved behind one registry plus a manifest-consistency test. Tailwind invalidation became package/dependency-aware, cold stylesheet discovery uses bounded concurrent I/O, and unsupported documents no longer copy their full text before project resolution succeeds.

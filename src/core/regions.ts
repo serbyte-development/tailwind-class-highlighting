@@ -9,20 +9,28 @@ export interface ClassSourceRegion extends SourceRegion {
   literal: boolean
 }
 
-const expressionAttributes = new Set(['ngClass', ':class', 'v-bind:class'])
+const expressionAttributes = new Set(['[ngClass]', ':class', 'v-bind:class'])
+const whitespacePattern = /\s/
+const regexSpecialCharacters = /[.*+?^${}()|[\]\\]/g
+const comparisonOperatorPattern = /^(?:===?|!==?|<=?|>=?)$/
 
 function skipWhitespace(text: string, offset: number): number {
-  while (offset < text.length) {
-    const char = text[offset]
-    if (!char || !/\s/.test(char)) break
-    offset++
+  let cursor = offset
+  while (cursor < text.length) {
+    const char = text[cursor]
+    if (!char || !whitespacePattern.test(char)) {
+      break
+    }
+    cursor++
   }
-  return offset
+  return cursor
 }
 
 function readQuoted(text: string, start: number): SourceRegion | null {
   const quote = text[start]
-  if (quote !== '"' && quote !== "'" && quote !== '`') return null
+  if (quote !== '"' && quote !== "'" && quote !== '`') {
+    return null
+  }
 
   for (let i = start + 1; i < text.length; i++) {
     if (text[i] === '\\') {
@@ -31,11 +39,15 @@ function readQuoted(text: string, start: number): SourceRegion | null {
     }
     if (quote === '`' && text[i] === '$' && text[i + 1] === '{') {
       const expression = readBalanced(text, i + 1, '{', '}')
-      if (!expression) return { start: start + 1, end: text.length }
+      if (!expression) {
+        return { start: start + 1, end: text.length }
+      }
       i = expression.end
       continue
     }
-    if (text[i] === quote) return { start: start + 1, end: i }
+    if (text[i] === quote) {
+      return { start: start + 1, end: i }
+    }
   }
 
   return { start: start + 1, end: text.length }
@@ -52,7 +64,9 @@ function readBalanced(
   open: string,
   close: string,
 ): SourceRegion | null {
-  if (text[start] !== open) return null
+  if (text[start] !== open) {
+    return null
+  }
 
   let depth = 1
   for (let i = start + 1; i < text.length; i++) {
@@ -65,50 +79,61 @@ function readBalanced(
 
     if (char === '/' && text[i + 1] === '/') {
       const newline = text.indexOf('\n', i + 2)
-      if (newline === -1) return { start: start + 1, end: text.length }
+      if (newline === -1) {
+        return { start: start + 1, end: text.length }
+      }
       i = newline
       continue
     }
 
     if (char === '/' && text[i + 1] === '*') {
       const end = text.indexOf('*/', i + 2)
-      if (end === -1) return { start: start + 1, end: text.length }
+      if (end === -1) {
+        return { start: start + 1, end: text.length }
+      }
       i = end + 1
       continue
     }
 
-    if (char === open) depth++
-    else if (char === close && --depth === 0) return { start: start + 1, end: i }
+    if (char === open) {
+      depth++
+    } else if (char === close && --depth === 0) {
+      return { start: start + 1, end: i }
+    }
   }
 
   return { start: start + 1, end: text.length }
 }
 
 function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return value.replace(regexSpecialCharacters, '\\$&')
 }
 
 function findAttributeRegions(text: string, attributes: string[]): ClassSourceRegion[] {
-  if (attributes.length === 0) return []
+  if (attributes.length === 0) {
+    return []
+  }
 
   const pattern = attributes
     .map(escapeRegex)
     .sort((a, b) => b.length - a.length)
     .join('|')
-  const regex = new RegExp(`(?<![\\w:-])(${pattern})\\s*=`, 'g')
+  const regex = new RegExp(`(?<![\\w:.-])(${pattern})\\s*=`, 'g')
   const regions: ClassSourceRegion[] = []
 
   for (const match of text.matchAll(regex)) {
-    if (match.index == null) continue
+    if (match.index == null) {
+      continue
+    }
 
     const valueStart = skipWhitespace(text, match.index + match[0].length)
     const char = text[valueStart]
-    const region =
-      char === '"' || char === "'" || char === '`'
-        ? readQuoted(text, valueStart)
-        : char === '{'
-          ? readBalanced(text, valueStart, '{', '}')
-          : null
+    let region: SourceRegion | null = null
+    if (char === '"' || char === "'" || char === '`') {
+      region = readQuoted(text, valueStart)
+    } else if (char === '{') {
+      region = readBalanced(text, valueStart, '{', '}')
+    }
 
     if (region && region.end > region.start) {
       regions.push({
@@ -124,7 +149,9 @@ function findAttributeRegions(text: string, attributes: string[]): ClassSourceRe
 }
 
 function findFunctionRegions(text: string, patterns: string[]): ClassSourceRegion[] {
-  if (patterns.length === 0) return []
+  if (patterns.length === 0) {
+    return []
+  }
 
   const validPatterns = patterns.filter((pattern) => {
     try {
@@ -134,7 +161,9 @@ function findFunctionRegions(text: string, patterns: string[]): ClassSourceRegio
       return false
     }
   })
-  if (validPatterns.length === 0) return []
+  if (validPatterns.length === 0) {
+    return []
+  }
 
   const matcher = new RegExp(
     `(?<![\\w$])(?:${validPatterns.join('|')})(?![\\w$])\\s*(?=\\(|\\\`)`,
@@ -143,16 +172,18 @@ function findFunctionRegions(text: string, patterns: string[]): ClassSourceRegio
 
   const regions: ClassSourceRegion[] = []
   for (const match of text.matchAll(matcher)) {
-    if (match.index == null) continue
+    if (match.index == null) {
+      continue
+    }
 
     const cursor = skipWhitespace(text, match.index + match[0].length)
     const char = text[cursor]
-    const region =
-      char === '('
-        ? readBalanced(text, cursor, '(', ')')
-        : char === '`'
-          ? readQuoted(text, cursor)
-          : null
+    let region: SourceRegion | null = null
+    if (char === '(') {
+      region = readBalanced(text, cursor, '(', ')')
+    } else if (char === '`') {
+      region = readQuoted(text, cursor)
+    }
 
     if (region && region.end > region.start) {
       regions.push({ ...region, literal: char === '`' })
@@ -173,7 +204,9 @@ export function findSourceRegions(text: string, options: RegionOptions): ClassSo
   const deduped: ClassSourceRegion[] = []
   for (const region of regions) {
     const previous = deduped[deduped.length - 1]
-    if (previous && previous.start === region.start && previous.end === region.end) continue
+    if (previous && previous.start === region.start && previous.end === region.end) {
+      continue
+    }
     deduped.push(region)
   }
 
@@ -195,9 +228,13 @@ function collectTemplateLiteralRegions(
     }
 
     if (text[i] === '$' && text[i + 1] === '{') {
-      if (i > segmentStart) regions.push({ start: segmentStart, end: i })
+      if (i > segmentStart) {
+        regions.push({ start: segmentStart, end: i })
+      }
       const expression = readBalanced(text, i + 1, '{', '}')
-      if (!expression || expression.end >= limit) return limit
+      if (!expression || expression.end >= limit) {
+        return limit
+      }
       collectQuotedLiteralRegions(text, expression.start, expression.end, regions)
       i = expression.end
       segmentStart = i + 1
@@ -205,12 +242,16 @@ function collectTemplateLiteralRegions(
     }
 
     if (text[i] === '`') {
-      if (i > segmentStart) regions.push({ start: segmentStart, end: i })
+      if (i > segmentStart) {
+        regions.push({ start: segmentStart, end: i })
+      }
       return i
     }
   }
 
-  if (segmentStart < limit) regions.push({ start: segmentStart, end: limit })
+  if (segmentStart < limit) {
+    regions.push({ start: segmentStart, end: limit })
+  }
   return limit
 }
 
@@ -222,27 +263,29 @@ function collectQuotedLiteralRegions(
 ): void {
   const isComparisonOperand = (quoteStart: number, quoteEnd: number): boolean => {
     const readOperator = (cursor: number, step: -1 | 1): string => {
-      while (cursor >= start && cursor < end && /\s/.test(text[cursor] ?? '')) cursor += step
+      let position = cursor
+      while (position >= start && position < end && whitespacePattern.test(text[position] ?? '')) {
+        position += step
+      }
 
       let operator = ''
       while (
-        cursor >= start &&
-        cursor < end &&
-        (text[cursor] === '=' ||
-          text[cursor] === '!' ||
-          text[cursor] === '<' ||
-          text[cursor] === '>')
+        position >= start &&
+        position < end &&
+        (text[position] === '=' ||
+          text[position] === '!' ||
+          text[position] === '<' ||
+          text[position] === '>')
       ) {
-        operator = step < 0 ? (text[cursor] ?? '') + operator : operator + (text[cursor] ?? '')
-        cursor += step
+        operator = step < 0 ? (text[position] ?? '') + operator : operator + (text[position] ?? '')
+        position += step
       }
       return operator
     }
 
-    const comparison = /^(?:===?|!==?|<=?|>=?)$/
     return (
-      comparison.test(readOperator(quoteStart - 1, -1)) ||
-      comparison.test(readOperator(quoteEnd + 1, 1))
+      comparisonOperatorPattern.test(readOperator(quoteStart - 1, -1)) ||
+      comparisonOperatorPattern.test(readOperator(quoteEnd + 1, 1))
     )
   }
 
@@ -251,7 +294,9 @@ function collectQuotedLiteralRegions(
 
     if (char === '"' || char === "'") {
       const region = readQuoted(text, i)
-      if (!region) continue
+      if (!region) {
+        continue
+      }
       const boundedEnd = Math.min(region.end, end)
       if (boundedEnd > region.start && !isComparisonOperand(i, boundedEnd)) {
         regions.push({ start: region.start, end: boundedEnd })
@@ -267,14 +312,18 @@ function collectQuotedLiteralRegions(
 
     if (char === '/' && text[i + 1] === '/') {
       const newline = text.indexOf('\n', i + 2)
-      if (newline === -1 || newline >= end) return
+      if (newline === -1 || newline >= end) {
+        return
+      }
       i = newline
       continue
     }
 
     if (char === '/' && text[i + 1] === '*') {
       const commentEnd = text.indexOf('*/', i + 2)
-      if (commentEnd === -1 || commentEnd >= end) return
+      if (commentEnd === -1 || commentEnd >= end) {
+        return
+      }
       i = commentEnd + 1
     }
   }
@@ -311,7 +360,7 @@ export function findClassTextRegions(
   return regions.filter(
     (region, index) =>
       index === 0 ||
-      region.start !== regions[index - 1]!.start ||
-      region.end !== regions[index - 1]!.end,
+      region.start !== regions[index - 1]?.start ||
+      region.end !== regions[index - 1]?.end,
   )
 }

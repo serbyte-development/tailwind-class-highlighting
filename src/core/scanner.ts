@@ -6,7 +6,9 @@ let scanner: CandidateScanner | undefined
 let scannerPromise: Promise<CandidateScanner> | undefined
 
 export async function getCandidateScanner(): Promise<CandidateScanner> {
-  if (scanner) return scanner
+  if (scanner) {
+    return scanner
+  }
 
   scannerPromise ??= import('@tailwindcss/oxide')
     .then(({ Scanner }) => new Scanner({ sources: [] }))

@@ -1,9 +1,10 @@
+// biome-ignore lint/correctness/noUndeclaredDependencies: VS Code provides this module in the extension host.
 import * as vscode from 'vscode'
 import { HighlightController } from './extension/controller'
 import { StyleConfigurator } from './extension/style-configurator'
 
 export function activate(context: vscode.ExtensionContext): void {
-  const styleConfigurator = new StyleConfigurator(context)
+  const styleConfigurator = new StyleConfigurator()
   context.subscriptions.push(
     new HighlightController(),
     styleConfigurator,

@@ -15,5 +15,6 @@ tests/**
 .vscodeignore
 esbuild.mjs
 tsconfig.json
-.prettierrc*
+biome.json
+.nvmrc
 package-lock.json

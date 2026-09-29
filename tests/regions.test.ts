@@ -2,18 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { findClassTextRegions, findSourceRegions } from '../src/core/regions'
 
 const options = {
-  classAttributes: ['class', 'className', 'class:list', ':class'],
+  classAttributes: ['class', 'className', 'ngClass', '[ngClass]', 'class:list', ':class'],
   classFunctions: ['clsx', 'cn', 'cva', 'tw(?:\\.[A-Za-z_$][\\w$-]*)?'],
 }
 
 describe('findSourceRegions', () => {
   it('finds quoted and expression attributes', () => {
-    const text = `<div class="flex p-4" className={cn("grid", active && "gap-2")} />`
+    const text = `<div class="flex p-4" ngClass="block" [ngClass]="{ hidden: active }" className={cn("grid", active && "gap-2")} />`
     const values = findSourceRegions(text, options).map((region) =>
       text.slice(region.start, region.end),
     )
 
     expect(values).toContain('flex p-4')
+    expect(values).toContain('block')
+    expect(values).toContain('{ hidden: active }')
     expect(values).toContain('cn("grid", active && "gap-2")')
     expect(values).toContain('"grid", active && "gap-2"')
   })
@@ -27,6 +29,15 @@ describe('findSourceRegions', () => {
     expect(values.some((value) => value.includes('"flex"'))).toBe(true)
     expect(values).toContain('grid gap-2')
   })
+
+  it('does not treat dotted property assignments as class attributes', () => {
+    const text = `node.className = "flex"; config.class = "grid"; <div className="block" />`
+    const values = findSourceRegions(text, options).map((region) =>
+      text.slice(region.start, region.end),
+    )
+
+    expect(values).toEqual(['block'])
+  })
 })
 
 it('does not match attribute-name suffixes', () => {
@@ -39,12 +50,13 @@ it('does not match attribute-name suffixes', () => {
 })
 
 it('keeps tagged templates intact across interpolated templates', () => {
-  const text = 'const styles = tw`flex ${active ? `bg-red-500` : "p-2"} grid`'
+  const interpolation = '$' + '{active ? `bg-red-500` : "p-2"}'
+  const text = `const styles = tw\`flex ${interpolation} grid\``
   const values = findSourceRegions(text, options).map((region) =>
     text.slice(region.start, region.end),
   )
 
-  expect(values).toContain('flex ${active ? `bg-red-500` : "p-2"} grid')
+  expect(values).toContain(`flex ${interpolation} grid`)
 })
 
 it('isolates literal class text from surrounding expression identifiers', () => {

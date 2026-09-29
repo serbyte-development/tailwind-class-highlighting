@@ -1,3 +1,4 @@
+// biome-ignore lint/correctness/noUndeclaredDependencies: VS Code provides this module in the extension host.
 import * as vscode from 'vscode'
 import { analyzeText } from '../core/analyze'
 import { getCandidateScanner } from '../core/scanner'
@@ -5,40 +6,71 @@ import { TailwindProjectManager } from '../tailwind/project'
 import { getConfiguration, type HighlightConfiguration } from './config'
 import { DecorationRenderer } from './decorations'
 
+const supportedDocumentSchemes = new Set(['file', 'vscode-remote'])
+
 export class HighlightController implements vscode.Disposable {
   private config: HighlightConfiguration = getConfiguration()
   private renderer = new DecorationRenderer(this.config.styles)
   private tailwindProjects = new TailwindProjectManager()
   private timers = new Map<vscode.TextEditor, NodeJS.Timeout>()
   private subscriptions: vscode.Disposable[] = []
+  private revision = 0
 
   constructor() {
     const tailwindStyles = vscode.workspace.createFileSystemWatcher('**/*.{css,pcss,postcss}')
     const tailwindPackages = vscode.workspace.createFileSystemWatcher('**/package.json')
+    const tailwindLocks = vscode.workspace.createFileSystemWatcher(
+      '**/{package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock,bun.lockb}',
+    )
 
-    const invalidateTailwindProjects = (): void => {
+    const rescanVisibleEditors = (): void => {
+      this.revision++
+      for (const editor of vscode.window.visibleTextEditors) {
+        this.schedule(editor, 0)
+      }
+    }
+
+    const invalidateTailwindStyles = (uri: vscode.Uri): void => {
+      this.tailwindProjects.invalidatePath(uri.fsPath)
+      rescanVisibleEditors()
+    }
+
+    const invalidateTailwindPackages = (): void => {
+      // package.json can change which ancestor/hoisted Tailwind installation resolves,
+      // so package changes require a full project-resolution reset.
       this.tailwindProjects.invalidateAll()
-      for (const editor of vscode.window.visibleTextEditors) this.schedule(editor, 0)
+      rescanVisibleEditors()
     }
 
     this.subscriptions.push(
       tailwindStyles,
       tailwindPackages,
-      tailwindStyles.onDidCreate(invalidateTailwindProjects),
-      tailwindStyles.onDidChange(invalidateTailwindProjects),
-      tailwindStyles.onDidDelete(invalidateTailwindProjects),
-      tailwindPackages.onDidCreate(invalidateTailwindProjects),
-      tailwindPackages.onDidChange(invalidateTailwindProjects),
-      tailwindPackages.onDidDelete(invalidateTailwindProjects),
+      tailwindLocks,
+      tailwindStyles.onDidCreate(invalidateTailwindStyles),
+      tailwindStyles.onDidChange(invalidateTailwindStyles),
+      tailwindStyles.onDidDelete(invalidateTailwindStyles),
+      tailwindPackages.onDidCreate(invalidateTailwindPackages),
+      tailwindPackages.onDidChange(invalidateTailwindPackages),
+      tailwindPackages.onDidDelete(invalidateTailwindPackages),
+      tailwindLocks.onDidCreate(invalidateTailwindPackages),
+      tailwindLocks.onDidChange(invalidateTailwindPackages),
+      tailwindLocks.onDidDelete(invalidateTailwindPackages),
+      vscode.workspace.onDidChangeWorkspaceFolders(invalidateTailwindPackages),
       vscode.window.onDidChangeVisibleTextEditors((editors) => {
-        for (const editor of editors) this.schedule(editor, 0)
+        for (const editor of editors) {
+          this.schedule(editor, 0)
+        }
       }),
       vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (editor) this.schedule(editor, 0)
+        if (editor) {
+          this.schedule(editor, 0)
+        }
       }),
       vscode.workspace.onDidChangeTextDocument((event) => {
         for (const editor of vscode.window.visibleTextEditors) {
-          if (editor.document === event.document) this.schedule(editor)
+          if (editor.document === event.document) {
+            this.schedule(editor)
+          }
         }
       }),
       vscode.workspace.onDidChangeConfiguration((event) => {
@@ -49,26 +81,35 @@ export class HighlightController implements vscode.Disposable {
         ) {
           return
         }
+        this.revision++
         this.config = getConfiguration()
         this.renderer.dispose()
         this.renderer = new DecorationRenderer(this.config.styles)
-        for (const editor of vscode.window.visibleTextEditors) this.schedule(editor, 0)
+        for (const editor of vscode.window.visibleTextEditors) {
+          this.schedule(editor, 0)
+        }
       }),
       vscode.workspace.onDidCloseTextDocument((document) => {
         for (const [editor, timer] of this.timers) {
-          if (editor.document !== document) continue
+          if (editor.document !== document) {
+            continue
+          }
           clearTimeout(timer)
           this.timers.delete(editor)
         }
       }),
     )
 
-    for (const editor of vscode.window.visibleTextEditors) this.schedule(editor, 0)
+    for (const editor of vscode.window.visibleTextEditors) {
+      this.schedule(editor, 0)
+    }
   }
 
   private schedule(editor: vscode.TextEditor, delay = this.config.debounceMs): void {
     const previous = this.timers.get(editor)
-    if (previous) clearTimeout(previous)
+    if (previous) {
+      clearTimeout(previous)
+    }
 
     const timer = setTimeout(() => {
       this.timers.delete(editor)
@@ -80,7 +121,7 @@ export class HighlightController implements vscode.Disposable {
   private async update(editor: vscode.TextEditor): Promise<void> {
     const document = editor.document
     if (
-      document.uri.scheme !== 'file' ||
+      !supportedDocumentSchemes.has(document.uri.scheme) ||
       !this.config.enabled ||
       !this.config.languages.has(document.languageId) ||
       this.config.styles.enabledGroups.size === 0
@@ -90,7 +131,7 @@ export class HighlightController implements vscode.Disposable {
     }
 
     const version = document.version
-    const text = document.getText()
+    const revision = this.revision
     const config = this.config
 
     try {
@@ -99,14 +140,19 @@ export class HighlightController implements vscode.Disposable {
         document.fileName,
         workspaceRoot,
       )
-      if (document.version !== version) return
+      if (document.version !== version || revision !== this.revision) {
+        return
+      }
       if (!tailwindProject) {
         this.renderer.clear(editor)
         return
       }
 
       const scanner = await getCandidateScanner()
-      if (document.version !== version) return
+      if (document.version !== version || revision !== this.revision) {
+        return
+      }
+      const text = document.getText()
 
       const spans = analyzeText(
         text,
@@ -118,7 +164,9 @@ export class HighlightController implements vscode.Disposable {
         scanner,
         tailwindProject.validator,
       )
-      if (document.version !== version) return
+      if (document.version !== version || revision !== this.revision) {
+        return
+      }
 
       this.renderer.apply(editor, spans)
     } catch (error) {
@@ -128,9 +176,14 @@ export class HighlightController implements vscode.Disposable {
   }
 
   dispose(): void {
-    for (const timer of this.timers.values()) clearTimeout(timer)
+    this.revision++
+    for (const timer of this.timers.values()) {
+      clearTimeout(timer)
+    }
     this.timers.clear()
-    for (const subscription of this.subscriptions) subscription.dispose()
+    for (const subscription of this.subscriptions) {
+      subscription.dispose()
+    }
     this.subscriptions = []
     this.renderer.dispose()
   }

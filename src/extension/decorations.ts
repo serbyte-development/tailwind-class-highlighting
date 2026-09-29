@@ -1,26 +1,10 @@
+// biome-ignore lint/correctness/noUndeclaredDependencies: VS Code provides this module in the extension host.
 import * as vscode from 'vscode'
-import { highlightGroups, type HighlightSpan } from '../core/types'
-import type { HighlightStyleConfiguration, UtilityUnderlineStyle } from './config'
+import { type HighlightSpan, highlightGroups } from '../core/types'
+import type { HighlightStyleConfiguration } from './config'
+import { styleDefinitions, type UtilityUnderlineStyle } from './style-registry'
 
 type RenderGroup = HighlightSpan['group']
-
-const foregroundThemeColors: Record<Exclude<RenderGroup, 'utility'>, string> = {
-  breakpoint: 'tailwindClassHighlighting.breakpoint',
-  variant: 'tailwindClassHighlighting.variant',
-  arbitraryVariant: 'tailwindClassHighlighting.arbitraryVariant',
-  relationshipVariant: 'tailwindClassHighlighting.relationshipVariant',
-  attributeVariant: 'tailwindClassHighlighting.attributeVariant',
-  pseudoElementVariant: 'tailwindClassHighlighting.pseudoElementVariant',
-  environmentVariant: 'tailwindClassHighlighting.environmentVariant',
-  unresolvedVariant: 'tailwindClassHighlighting.unresolvedVariant',
-  prefix: 'tailwindClassHighlighting.prefix',
-  modifier: 'tailwindClassHighlighting.modifier',
-  arbitrary: 'tailwindClassHighlighting.arbitrary',
-  arbitraryValue: 'tailwindClassHighlighting.arbitraryValue',
-  cssVariable: 'tailwindClassHighlighting.cssVariable',
-  important: 'tailwindClassHighlighting.important',
-  nonTailwind: 'tailwindClassHighlighting.nonTailwind',
-}
 
 function utilityDecoration(
   underlineStyle: UtilityUnderlineStyle,
@@ -46,12 +30,14 @@ export class DecorationRenderer implements vscode.Disposable {
 
   constructor(styles: HighlightStyleConfiguration) {
     for (const group of highlightGroups) {
-      if (!styles.enabledGroups.has(group)) continue
+      if (!styles.enabledGroups.has(group)) {
+        continue
+      }
 
       const options =
         group === 'utility'
           ? utilityDecoration(styles.utilityUnderlineStyle, styles.utilityColorEnabled)
-          : { color: new vscode.ThemeColor(foregroundThemeColors[group]) }
+          : { color: new vscode.ThemeColor(styleDefinitions[group].colorId) }
       this.decorations.set(group, vscode.window.createTextEditorDecorationType(options))
     }
   }
@@ -60,7 +46,9 @@ export class DecorationRenderer implements vscode.Disposable {
     const renderGroups = [...this.decorations.keys()]
     const grouped = new Map<RenderGroup, HighlightSpan[]>(renderGroups.map((group) => [group, []]))
 
-    for (const span of spans) grouped.get(span.group)?.push(span)
+    for (const span of spans) {
+      grouped.get(span.group)?.push(span)
+    }
 
     let editorSignatures = this.signatures.get(editor)
     if (!editorSignatures) {
@@ -69,9 +57,11 @@ export class DecorationRenderer implements vscode.Disposable {
     }
 
     for (const group of renderGroups) {
-      const groupSpans = grouped.get(group)!
+      const groupSpans = grouped.get(group) ?? []
       const signature = groupSpans.map((span) => `${span.start}:${span.end}`).join(',')
-      if (editorSignatures.get(group) === signature) continue
+      if (editorSignatures.get(group) === signature) {
+        continue
+      }
 
       const ranges = groupSpans.map(
         (span) =>
@@ -80,7 +70,11 @@ export class DecorationRenderer implements vscode.Disposable {
             editor.document.positionAt(span.end),
           ),
       )
-      editor.setDecorations(this.decorations.get(group)!, ranges)
+      const decoration = this.decorations.get(group)
+      if (!decoration) {
+        continue
+      }
+      editor.setDecorations(decoration, ranges)
       editorSignatures.set(group, signature)
     }
   }
@@ -90,7 +84,9 @@ export class DecorationRenderer implements vscode.Disposable {
   }
 
   dispose(): void {
-    for (const decoration of this.decorations.values()) decoration.dispose()
+    for (const decoration of this.decorations.values()) {
+      decoration.dispose()
+    }
     this.decorations.clear()
     this.signatures = new WeakMap()
   }

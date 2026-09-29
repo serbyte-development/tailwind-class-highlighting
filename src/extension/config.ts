@@ -1,7 +1,22 @@
+// biome-ignore lint/correctness/noUndeclaredDependencies: VS Code provides this module in the extension host.
 import * as vscode from 'vscode'
-import type { HighlightGroup } from '../core/types'
-
-export type UtilityUnderlineStyle = 'dotted' | 'solid' | 'dashed' | 'double' | 'none'
+import { type HighlightGroup, highlightGroups } from '../core/types'
+import {
+  defaultClassAttributes,
+  defaultClassFunctions,
+  defaultLanguages,
+  readBooleanSetting,
+  readDebounceSetting,
+  readRegexArraySetting,
+  readStringArraySetting,
+} from './config-values'
+import {
+  defaultUtilityColorEnabled,
+  defaultUtilityUnderlineStyle,
+  isUtilityUnderlineStyle,
+  styleDefinitions,
+  type UtilityUnderlineStyle,
+} from './style-registry'
 
 export interface HighlightStyleConfiguration {
   enabledGroups: ReadonlySet<HighlightGroup>
@@ -22,56 +37,31 @@ function unique(values: string[]): string[] {
   return [...new Set(values)]
 }
 
-export const highlightStyleDefaults: Readonly<Record<HighlightGroup, boolean>> = {
-  utility: true,
-  breakpoint: true,
-  variant: true,
-  arbitraryVariant: false,
-  relationshipVariant: false,
-  attributeVariant: false,
-  pseudoElementVariant: false,
-  environmentVariant: false,
-  unresolvedVariant: true,
-  prefix: true,
-  modifier: true,
-  arbitrary: true,
-  arbitraryValue: false,
-  cssVariable: false,
-  important: true,
-  nonTailwind: false,
-}
-
-export const defaultUtilityUnderlineStyle: UtilityUnderlineStyle = 'dotted'
-export const defaultUtilityColorEnabled = false
-
-const underlineStyles = new Set<UtilityUnderlineStyle>([
-  'dotted',
-  'solid',
-  'dashed',
-  'double',
-  'none',
-])
-
 function getStyleConfiguration(config: vscode.WorkspaceConfiguration): HighlightStyleConfiguration {
-  const enabledGroups = new Set<HighlightGroup>()
+  const enabledGroups = new Set<(typeof highlightGroups)[number]>()
 
-  for (const [group, defaultEnabled] of Object.entries(highlightStyleDefaults) as Array<
-    [HighlightGroup, boolean]
-  >) {
-    if (config.get(`styles.${group}.enabled`, defaultEnabled)) enabledGroups.add(group)
+  for (const group of highlightGroups) {
+    if (
+      readBooleanSetting(
+        config.get<unknown>(`styles.${group}.enabled`),
+        styleDefinitions[group].enabledByDefault,
+      )
+    ) {
+      enabledGroups.add(group)
+    }
   }
 
-  const underlineStyle = config.get<UtilityUnderlineStyle>(
-    'styles.utility.underlineStyle',
-    defaultUtilityUnderlineStyle,
-  )
+  const underlineStyle = config.get<unknown>('styles.utility.underlineStyle')
 
   return {
     enabledGroups,
-    utilityUnderlineStyle: underlineStyles.has(underlineStyle)
+    utilityUnderlineStyle: isUtilityUnderlineStyle(underlineStyle)
       ? underlineStyle
       : defaultUtilityUnderlineStyle,
-    utilityColorEnabled: config.get('styles.utility.colorEnabled', defaultUtilityColorEnabled),
+    utilityColorEnabled: readBooleanSetting(
+      config.get<unknown>('styles.utility.colorEnabled'),
+      defaultUtilityColorEnabled,
+    ),
   }
 }
 
@@ -79,48 +69,29 @@ export function getConfiguration(): HighlightConfiguration {
   const config = vscode.workspace.getConfiguration('tailwindClassHighlighting')
   const tailwindConfig = vscode.workspace.getConfiguration('tailwindCSS')
 
-  const classAttributes = config.get<string[]>('classAttributes', [
-    'class',
-    'className',
-    'ngClass',
-    'class:list',
-    ':class',
-    'v-bind:class',
-  ])
-  const classFunctions = config.get<string[]>('classFunctions', [
-    'clsx',
-    'classnames',
-    'cn',
-    'cva',
-    'twMerge',
-    'tw(?:\\.[A-Za-z_$][\\w$-]*)?',
-  ])
+  const classAttributes = readStringArraySetting(
+    config.get<unknown>('classAttributes'),
+    defaultClassAttributes,
+  )
+  const classFunctions = readRegexArraySetting(
+    config.get<unknown>('classFunctions'),
+    defaultClassFunctions,
+  )
+  const tailwindClassAttributes = readStringArraySetting(
+    tailwindConfig.get<unknown>('classAttributes'),
+    [],
+  )
+  const tailwindClassFunctions = readRegexArraySetting(
+    tailwindConfig.get<unknown>('classFunctions'),
+    [],
+  )
 
   return {
-    enabled: config.get('enabled', true),
-    languages: new Set(
-      config.get('languages', [
-        'html',
-        'javascript',
-        'javascriptreact',
-        'typescript',
-        'typescriptreact',
-        'vue',
-        'svelte',
-        'astro',
-        'php',
-        'blade',
-      ]),
-    ),
-    classAttributes: unique([
-      ...classAttributes,
-      ...tailwindConfig.get<string[]>('classAttributes', []),
-    ]),
-    classFunctions: unique([
-      ...classFunctions,
-      ...tailwindConfig.get<string[]>('classFunctions', []),
-    ]),
-    debounceMs: Math.max(0, Math.min(250, config.get('debounceMs', 25))),
+    enabled: readBooleanSetting(config.get<unknown>('enabled'), true),
+    languages: new Set(readStringArraySetting(config.get<unknown>('languages'), defaultLanguages)),
+    classAttributes: unique([...classAttributes, ...tailwindClassAttributes]),
+    classFunctions: unique([...classFunctions, ...tailwindClassFunctions]),
+    debounceMs: readDebounceSetting(config.get<unknown>('debounceMs')),
     styles: getStyleConfiguration(config),
   }
 }

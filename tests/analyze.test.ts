@@ -1,6 +1,6 @@
 import * as path from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
 import { Scanner } from '@tailwindcss/oxide'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { analyzeText } from '../src/core/analyze'
 import { highlightGroups } from '../src/core/types'
 import type { CandidateValidator } from '../src/core/validator'
@@ -10,7 +10,7 @@ const scanner = new Scanner({ sources: [] })
 let validator: CandidateValidator
 
 const options = {
-  classAttributes: ['class', 'className'],
+  classAttributes: ['class', 'className', 'ngClass', '[ngClass]'],
   classFunctions: ['clsx', 'cn', 'cva'],
 }
 
@@ -19,7 +19,9 @@ beforeAll(async () => {
   const project = await manager.getProject(
     path.resolve('tests/fixtures/tailwind-v4/src/component.js'),
   )
-  if (!project) throw new Error('Tailwind v4 test project did not load')
+  if (!project) {
+    throw new Error('Tailwind v4 test project did not load')
+  }
   validator = project.validator
 })
 
@@ -77,6 +79,57 @@ describe('analyzeText', () => {
     expect(values).not.toContain('custom-card')
     expect(values).not.toContain('condition')
     expect(values).not.toContain('variableName')
+  })
+
+  it('does not style expression identifiers that happen to be valid Tailwind utilities', () => {
+    const text = `<div className={flex ? "grid" : block} />; const value = cn(hidden, "flex")`
+    const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted.filter(({ value }) => value === 'flex')).toEqual([
+      { value: 'flex', group: 'utility' },
+    ])
+    expect(highlighted).toContainEqual({ value: 'grid', group: 'utility' })
+    expect(highlighted.some(({ value }) => value === 'block')).toBe(false)
+    expect(highlighted.some(({ value }) => value === 'hidden')).toBe(false)
+  })
+
+  it('styles valid unquoted class-object keys without styling expression values', () => {
+    const text = `<div className={cn({ hidden: active, block: flex })} />`
+    const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({ value: 'hidden', group: 'utility' })
+    expect(highlighted).toContainEqual({ value: 'block', group: 'utility' })
+    expect(highlighted.some(({ value }) => value === 'flex')).toBe(false)
+  })
+
+  it('handles static and bound Angular ngClass forms without styling bound values', () => {
+    const text = `<div ngClass="flex grid" [ngClass]="{ hidden: active, block: flex }" />`
+    const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({ value: 'flex', group: 'utility' })
+    expect(highlighted).toContainEqual({ value: 'grid', group: 'utility' })
+    expect(highlighted).toContainEqual({ value: 'hidden', group: 'utility' })
+    expect(highlighted).toContainEqual({ value: 'block', group: 'utility' })
+    expect(highlighted.filter(({ value }) => value === 'active')).toEqual([])
+  })
+
+  it('keeps outer literal class text when nested helper-looking strings overlap it', () => {
+    const text = `<div className="cn('x') clsx('y') flex" />`
+    const highlighted = analyzeText(text, options, scanner, validator).map((span) => ({
+      value: text.slice(span.start, span.end),
+      group: span.group,
+    }))
+
+    expect(highlighted).toContainEqual({ value: 'flex', group: 'utility' })
   })
 
   it('highlights unresolved variants when the underlying utility is valid', () => {

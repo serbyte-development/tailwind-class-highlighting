@@ -1,8 +1,16 @@
+import type { SpecializedVariantGroup } from '../core/types'
+
 export interface StyleColor {
   rgb: string
   opacity: number
   rgba: string
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const hexColorPattern = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
 
 function expandShortHex(value: string): string {
   return value
@@ -12,10 +20,15 @@ function expandShortHex(value: string): string {
 }
 
 function parseHex(value: string): { rgb: string; alpha: number } | null {
-  const match = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value.trim())
-  if (!match) return null
+  const match = hexColorPattern.exec(value.trim())
+  if (!match) {
+    return null
+  }
 
-  const raw = match[1]!
+  const raw = match[1]
+  if (!raw) {
+    return null
+  }
   const expanded = raw.length <= 4 ? expandShortHex(raw) : raw
   const rgb = `#${expanded.slice(0, 6).toUpperCase()}`
   const alpha = expanded.length === 8 ? Number.parseInt(expanded.slice(6, 8), 16) : 255
@@ -24,7 +37,9 @@ function parseHex(value: string): { rgb: string; alpha: number } | null {
 
 export function colorWithOpacity(rgb: string, opacity: number): string {
   const parsed = parseHex(rgb)
-  if (!parsed) throw new Error(`Invalid RGB color: ${rgb}`)
+  if (!parsed) {
+    throw new Error(`Invalid RGB color: ${rgb}`)
+  }
 
   const clamped = Math.max(0, Math.min(100, Math.round(opacity)))
   const alpha = Math.round((clamped / 100) * 255)
@@ -37,7 +52,9 @@ export function colorWithOpacity(rgb: string, opacity: number): string {
 export function parseStyleColor(value: unknown, fallback: string): StyleColor {
   const parsed = typeof value === 'string' ? parseHex(value) : null
   const fallbackParsed = parseHex(fallback)
-  if (!fallbackParsed) throw new Error(`Invalid fallback color: ${fallback}`)
+  if (!fallbackParsed) {
+    throw new Error(`Invalid fallback color: ${fallback}`)
+  }
 
   const color = parsed ?? fallbackParsed
   const opacity = Math.round((color.alpha / 255) * 100)
@@ -55,25 +72,56 @@ export function setColorCustomizations(
 ): Record<string, unknown> {
   const next = { ...current }
   for (const colorId of colorIds) {
-    if (value === undefined) delete next[colorId]
-    else next[colorId] = value
+    if (value === undefined) {
+      delete next[colorId]
+    } else {
+      next[colorId] = value
+    }
   }
   return next
 }
-import type { SpecializedVariantGroup } from '../core/types'
+
+export function clearColorCustomizations(
+  current: Readonly<Record<string, unknown>>,
+  colorIds: readonly string[],
+): Record<string, unknown> {
+  const next = { ...current }
+
+  for (const colorId of colorIds) {
+    delete next[colorId]
+  }
+
+  for (const [key, value] of Object.entries(next)) {
+    if (!key.startsWith('[') || !isRecord(value)) {
+      continue
+    }
+
+    const themed = { ...value }
+    for (const colorId of colorIds) {
+      delete themed[colorId]
+    }
+    next[key] = themed
+  }
+
+  return next
+}
 
 export const variantAccentColors: Readonly<Record<SpecializedVariantGroup, string>> = {
   arbitraryVariant: '#C084FC',
   relationshipVariant: '#22D3EE',
   attributeVariant: '#FB923C',
   pseudoElementVariant: '#F472B6',
-  environmentVariant: '#60A5FA',
+  environmentVariant: '#0000FF',
 }
 
-function mixRgb(base: string, accent: string, accentWeight = 0.45): string {
+export const variantAccentWeight = 0.45
+
+function mixRgb(base: string, accent: string, accentWeight = variantAccentWeight): string {
   const baseColor = parseHex(base)
   const accentColor = parseHex(accent)
-  if (!baseColor || !accentColor) throw new Error('Invalid color for variant palette')
+  if (!baseColor || !accentColor) {
+    throw new Error('Invalid color for variant palette')
+  }
 
   const channel = (value: string, offset: number): number =>
     Number.parseInt(value.slice(offset, offset + 2), 16)
@@ -91,10 +139,14 @@ function mixRgb(base: string, accent: string, accentWeight = 0.45): string {
 
 export function deriveVariantPalette(base: string): Record<SpecializedVariantGroup, string> {
   const parsed = parseStyleColor(base, '#2DF3AC')
-  return Object.fromEntries(
-    Object.entries(variantAccentColors).map(([group, accent]) => [
-      group,
-      colorWithOpacity(mixRgb(parsed.rgb, accent), parsed.opacity),
-    ]),
-  ) as Record<SpecializedVariantGroup, string>
+  const derive = (group: SpecializedVariantGroup): string =>
+    colorWithOpacity(mixRgb(parsed.rgb, variantAccentColors[group]), parsed.opacity)
+
+  return {
+    arbitraryVariant: derive('arbitraryVariant'),
+    relationshipVariant: derive('relationshipVariant'),
+    attributeVariant: derive('attributeVariant'),
+    pseudoElementVariant: derive('pseudoElementVariant'),
+    environmentVariant: derive('environmentVariant'),
+  }
 }

@@ -1,6 +1,6 @@
 import * as path from 'node:path'
-import { beforeAll, bench, describe } from 'vitest'
 import { Scanner } from '@tailwindcss/oxide'
+import { beforeAll, bench, describe } from 'vitest'
 import { analyzeText } from '../src/core/analyze'
 import { highlightGroups } from '../src/core/types'
 import type { CandidateValidator } from '../src/core/validator'
@@ -22,7 +22,9 @@ beforeAll(async () => {
   const project = await manager.getProject(
     path.resolve('tests/fixtures/tailwind-v4/src/component.js'),
   )
-  if (!project) throw new Error('Tailwind v4 benchmark project did not load')
+  if (!project) {
+    throw new Error('Tailwind v4 benchmark project did not load')
+  }
   validator = project.validator
 })
 

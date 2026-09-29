@@ -3,6 +3,9 @@ summary: 'Validation, esbuild bundling, native VSIX packaging, CI workflows, tar
 paths:
   - esbuild.mjs
   - scripts/package.mjs
+  - biome.json
+  - tsconfig.json
+  - .nvmrc
   - .vscodeignore
   - .github/workflows/
   - package.json
@@ -12,9 +15,10 @@ paths:
 
 ## Validation and Build
 
-- `npm test`: Vitest core/project tests.
-- `npm run check`: TypeScript `--noEmit`.
-- `npm run format:check`: Prettier check.
+- Repository tooling uses Node.js 24 (`.nvmrc` and CI), while the shipped extension bundle still targets Node 20 compatibility for the VS Code `^1.95.0` host contract.
+- `npm run verify`: strict Biome check, TypeScript `--noEmit`, then Vitest.
+- `npm run lint` / `npm run lint:fix`: Biome validation/fixes, including formatting and import organization.
+- `npm run format`: Biome formatting only.
 - `npm run build`: esbuild CJS bundle for Node 20 with source map.
 - `npm run build:production`: minified bundle without source map.
 
@@ -24,9 +28,9 @@ paths:
 
 `npm run package` selects current host OS/architecture and calls `vsce package --target`, writing a target-specific VSIX. Supported matrix is macOS, Linux, Windows × x64/arm64. Unsupported host pairs fail.
 
-CI runs install, tests, typecheck, formatting, build, and host packaging on pushes/PRs. Package workflow runs manually or on `v*` tags across all six targets and uploads artifacts. Workflows do not publish to registries.
+CI uses Node 24. Linux runs the complete `verify` gate and host packaging, while lightweight macOS and Windows jobs run path-sensitive tests. The Package workflow follows the same pattern: full validation once on Linux, tests on representative macOS/Windows hosts, then six OS/architecture jobs that only install and package their native target. This preserves cross-platform coverage without repeating lint/typecheck/full validation six times. Workflows use the current Node-24-generation official GitHub actions and do not publish to registries.
 
-`.vscodeignore` keeps source, tests, benchmarks, wiki, build plans, scripts, secrets/env files, source maps, lockfile, and build config out of VSIX payload.
+`.vscodeignore` keeps source, tests, benchmarks, wiki, build plans, scripts, secrets/env files, source maps, lockfile, Biome/Node-version files, and build config out of VSIX payload.
 
 ## Registry Publishing Safety
 
